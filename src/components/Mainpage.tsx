@@ -1,6 +1,7 @@
 'use client'
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Utensils, Users, Droplets, Sun, Moon, WifiOff, HelpCircle, Brain, Plus, X, Globe, Heart, Home, Star, Car, Phone, Music, Coffee, Bed, Sun as SunIcon, Zap, Camera, Gift, Clock, MapPin, Thermometer, Mic, MessageCircle, Play, Bus, Bike, Plane, Key, Building2, Stethoscope, Users2, Briefcase, GraduationCap, Dumbbell, Pill, Frown, Smile, CloudRain, AlertTriangle, Activity, GamepadIcon, Monitor, Lightbulb, Youtube } from 'lucide-react';
+import Image from 'next/image';
+import { Utensils, Users, Droplets, Sun, Moon, WifiOff, HelpCircle, Brain, Plus, X, Globe, Heart, Home, Star, Car, Phone, Music, Coffee, Bed, Sun as SunIcon, Zap, Camera, Gift, Clock, MapPin, Thermometer, Mic, MessageCircle, Play, Bus, Bike, Plane, Key, Building2, Stethoscope, Users2, Briefcase, GraduationCap, Dumbbell, Pill, Frown, Smile, CloudRain, AlertTriangle, Activity, GamepadIcon, Monitor, Youtube } from 'lucide-react';
 
 interface Option {
   id: string;
@@ -377,8 +378,7 @@ const CommunicationInterface: React.FC = () => {
   // 1 = Keep Watching, 2 = Close
   const [selectedYtModalIndex, setSelectedYtModalIndex] = useState<number | null>(1);
   const [activeYtModalIndex, setActiveYtModalIndex] = useState<number | null>(null);
-  const YT_API_KEY = (process.env.NEXT_PUBLIC_YT_API_KEY as string | undefined);
-  const YT_FIXED_QUERY = 'old people relaxation videos';
+  // YouTube API key and query removed as YouTube view opener is currently unused
   // Lights BLE
   const LIGHTS_SERVICE_UUID = '19b10000-e8f2-537e-4f6c-d104768a1214';
   const LIGHTS_CHAR_UUID = '19b10001-e8f2-537e-4f6c-d104768a1214';
@@ -453,7 +453,7 @@ const CommunicationInterface: React.FC = () => {
       lightColor: 'bg-purple-400',
       soundFile: 'select.mp3'
     }
-  ], [t]);
+  ], []);
 
   // Dynamic options state
   const [options, setOptions] = useState<Option[]>([]);
@@ -867,82 +867,10 @@ const CommunicationInterface: React.FC = () => {
     }
   }, []);
 
-  const toggleLights = useCallback(async () => {
-    if (!isLightsConnected) {
-      // Show message instead of trying to connect
-      setShowLightsMessage(true);
-      setTimeout(() => setShowLightsMessage(false), 3000);
-      return;
-    }
-    const nextOn = !areLightsOn;
-    const ok = await writeLightsByte(nextOn ? 0x01 : 0x00);
-    if (ok) setAreLightsOn(nextOn);
-  }, [areLightsOn, isLightsConnected, writeLightsByte]);
+  // toggleLights removed (unused)
 
   // YouTube helpers
-  const openYouTubeView = useCallback(async () => {
-    console.log('🚀 openYouTubeView called, YT_API_KEY:', YT_API_KEY ? 'present' : 'MISSING');
-    setShowYouTubeView(true);
-    console.log('📺 setShowYouTubeView(true) called');
-    setYtError(null);
-    setYtLoading(true);
-    setYtVideos([]);
-    // Clear main-menu selection/index to avoid visual iteration behind overlay
-    setSelectedOption(null);
-    setActiveSelection(null);
-    setCurrentMenuIndex(0);
-    try {
-      if (!YT_API_KEY) {
-        console.log('❌ YouTube API key missing!');
-        throw new Error('Missing YouTube API key');
-      }
-      const url = new URL('https://www.googleapis.com/youtube/v3/search');
-      url.searchParams.set('key', YT_API_KEY);
-      url.searchParams.set('part', 'snippet');
-      url.searchParams.set('type', 'video');
-      url.searchParams.set('maxResults', '5');
-      url.searchParams.set('q', YT_FIXED_QUERY);
-      url.searchParams.set('safeSearch', 'moderate');
-      url.searchParams.set('relevanceLanguage', 'en');
-      url.searchParams.set('order', 'relevance');
-
-      const res = await fetch(url.toString());
-      if (!res.ok) throw new Error(`YouTube API error ${res.status}`);
-      const data: {
-        items?: Array<{
-          id?: { videoId?: string };
-          snippet?: {
-            title?: string;
-            thumbnails?: {
-              high?: { url?: string };
-              medium?: { url?: string };
-              default?: { url?: string };
-            };
-          };
-        }>;
-      } = await res.json();
-      const items = Array.isArray(data.items) ? data.items : [];
-      const vids = items
-        .map((it) => {
-          const vid = it?.id?.videoId;
-          const title = it?.snippet?.title ?? 'Video';
-          const thumb = it?.snippet?.thumbnails?.high?.url
-            || it?.snippet?.thumbnails?.medium?.url
-            || it?.snippet?.thumbnails?.default?.url
-            || (vid ? `https://img.youtube.com/vi/${vid}/hqdefault.jpg` : '');
-          return vid ? { id: vid, title, thumb } : null;
-        })
-        .filter(Boolean) as Array<{ id: string; title: string; thumb: string }>;
-      setYtVideos(vids);
-    } catch (e) {
-      console.error(e);
-      setYtError('Failed to load videos.');
-    } finally {
-      setYtLoading(false);
-      // Scroll to top of page content
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  }, [YT_API_KEY]);
+  // openYouTubeView removed (unused)
 
   // When a video modal opens, clear main-menu state to prevent background iteration
   useEffect(() => {
@@ -1433,7 +1361,7 @@ const CommunicationInterface: React.FC = () => {
                         } ${isIterating ? 'ring-4 ring-purple-400/50' : ''} ${isActivated ? 'border-green-400 bg-green-50 scale-105' : ''}`}
                       >
                         <div className="overflow-hidden rounded-lg">
-                          <img src={v.thumb} alt={`Thumbnail: ${v.title}`} className="w-full aspect-video object-cover" />
+                          <Image src={v.thumb} alt={`Thumbnail: ${v.title}`} width={640} height={360} className="w-full aspect-video object-cover" unoptimized />
                         </div>
                         <div className={`p-3 transition-all duration-300 ${
                           isDarkMode ? 'text-white' : 'text-gray-900'
