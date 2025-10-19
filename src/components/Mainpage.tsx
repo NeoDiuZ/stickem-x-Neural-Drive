@@ -369,9 +369,9 @@ const CommunicationInterface: React.FC = () => {
   const notificationWrapperRef = useRef<((event: Event) => void) | undefined>(undefined);
   // YouTube state
   const [showYouTubeView, setShowYouTubeView] = useState(false);
-  const [ytVideos, setYtVideos] = useState<Array<{ id: string; title: string; thumb: string }>>([]);
-  const [ytLoading, setYtLoading] = useState(false);
-  const [ytError, setYtError] = useState<string | null>(null);
+  const [ytVideos] = useState<Array<{ id: string; title: string; thumb: string }>>([]);
+  const [ytLoading] = useState(false);
+  const [ytError] = useState<string | null>(null);
   const [ytModal, setYtModal] = useState<{ open: boolean; id: string | null; title: string }>(() => ({ open: false, id: null, title: '' }));
   const [selectedYtIndex, setSelectedYtIndex] = useState<number | null>(null);
   const [activeYtIndex, setActiveYtIndex] = useState<number | null>(null);
@@ -385,9 +385,8 @@ const CommunicationInterface: React.FC = () => {
   const connectedLightsDeviceRef = useRef<BluetoothDevice | null>(null);
   const lightsCharacteristicRef = useRef<BluetoothRemoteGATTCharacteristic | null>(null);
   const [isLightsConnected, setIsLightsConnected] = useState(false);
-  const [areLightsOn, setAreLightsOn] = useState(false);
   const [isConnectingAccessories, setIsConnectingAccessories] = useState(false);
-  const [showLightsMessage, setShowLightsMessage] = useState(false);
+  const [showLightsMessage] = useState(false);
 
   // Stick 'Em Robot will use the existing lights connection system
 
@@ -778,7 +777,6 @@ const CommunicationInterface: React.FC = () => {
   // Lights connect/disconnect and write helpers
   const handleLightsDisconnection = useCallback(() => {
     setIsLightsConnected(false);
-    setAreLightsOn(false);
     lightsCharacteristicRef.current = null;
   }, []);
 
@@ -818,17 +816,7 @@ const CommunicationInterface: React.FC = () => {
     }
   }, [LIGHTS_SERVICE_UUID, LIGHTS_CHAR_UUID, handleLightsDisconnection, t]);
 
-  const writeLightsByte = useCallback(async (byte: number) => {
-    const ch = lightsCharacteristicRef.current;
-    if (!ch || typeof ch.writeValue !== 'function') return false;
-    try {
-      await ch.writeValue(new Uint8Array([byte & 0xff]));
-      return true;
-    } catch (e) {
-      console.error('Lights write failed:', e);
-      return false;
-    }
-  }, []);
+  // writeLightsByte removed (unused)
 
   const connectAccessories = useCallback(async () => {
     setIsConnectingAccessories(true);
