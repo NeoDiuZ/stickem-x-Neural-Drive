@@ -379,14 +379,14 @@ const CommunicationInterface: React.FC = () => {
   const [selectedYtModalIndex, setSelectedYtModalIndex] = useState<number | null>(1);
   const [activeYtModalIndex, setActiveYtModalIndex] = useState<number | null>(null);
   // YouTube API key and query removed as YouTube view opener is currently unused
-  // Lights BLE
-  const LIGHTS_SERVICE_UUID = '19b10000-e8f2-537e-4f6c-d104768a1214';
-  const LIGHTS_CHAR_UUID = '19b10001-e8f2-537e-4f6c-d104768a1214';
-  const connectedLightsDeviceRef = useRef<BluetoothDevice | null>(null);
-  const lightsCharacteristicRef = useRef<BluetoothRemoteGATTCharacteristic | null>(null);
-  const [isLightsConnected, setIsLightsConnected] = useState(false);
+  // Stick 'Em Robot BLE (using UART service)
+  const STICKEM_SERVICE_UUID = '0000ffe0-0000-1000-8000-00805f9b34fb'; // 0xFFE0 in proper format
+  const STICKEM_CHAR_UUID = '0000ffe1-0000-1000-8000-00805f9b34fb';   // 0xFFE1 in proper format
+  const connectedStickEmDeviceRef = useRef<BluetoothDevice | null>(null);
+  const stickEmCharacteristicRef = useRef<BluetoothRemoteGATTCharacteristic | null>(null);
+  const [isStickEmConnected, setIsStickEmConnected] = useState(false);
   const [isConnectingAccessories, setIsConnectingAccessories] = useState(false);
-  const [showLightsMessage] = useState(false);
+  const [showStickEmMessage] = useState(false);
 
   // Stick 'Em Robot will use the existing lights connection system
 
@@ -774,69 +774,69 @@ const CommunicationInterface: React.FC = () => {
     }
   }, [handleDisconnection, t]);
 
-  // Lights connect/disconnect and write helpers
-  const handleLightsDisconnection = useCallback(() => {
-    setIsLightsConnected(false);
-    lightsCharacteristicRef.current = null;
+  // Stick 'Em Robot connect/disconnect and write helpers
+  const handleStickEmDisconnection = useCallback(() => {
+    setIsStickEmConnected(false);
+    stickEmCharacteristicRef.current = null;
   }, []);
 
-  const connectToLightsDevice = useCallback(async (): Promise<boolean> => {
+  const connectToStickEmDevice = useCallback(async (): Promise<boolean> => {
     try {
       if (!navigator.bluetooth || !navigator.bluetooth.requestDevice) {
         throw new Error(t.bluetoothNotSupported);
       }
 
       const device = await navigator.bluetooth.requestDevice({
-        filters: [{ services: [LIGHTS_SERVICE_UUID] }],
-        optionalServices: [LIGHTS_SERVICE_UUID]
+        filters: [{ services: [STICKEM_SERVICE_UUID] }],
+        optionalServices: [STICKEM_SERVICE_UUID]
       }) as BluetoothDevice;
 
-      connectedLightsDeviceRef.current = device;
-      device.addEventListener('gattserverdisconnected', handleLightsDisconnection);
+      connectedStickEmDeviceRef.current = device;
+      device.addEventListener('gattserverdisconnected', handleStickEmDisconnection);
 
       if (!device.gatt) {
         throw new Error('Bluetooth device does not support GATT');
       }
 
       const server = await device.gatt.connect();
-      const service = await server.getPrimaryService(LIGHTS_SERVICE_UUID);
-      const characteristic = await service.getCharacteristic(LIGHTS_CHAR_UUID);
-      lightsCharacteristicRef.current = characteristic;
+      const service = await server.getPrimaryService(STICKEM_SERVICE_UUID);
+      const characteristic = await service.getCharacteristic(STICKEM_CHAR_UUID);
+      stickEmCharacteristicRef.current = characteristic;
 
       // Try reading initial value to validate link (best-effort)
       try { await characteristic.readValue(); } catch {}
 
-      setIsLightsConnected(true);
+      setIsStickEmConnected(true);
       return true;
     } catch (error) {
-      console.error('Lights connection failed:', error);
-      setIsLightsConnected(false);
-      lightsCharacteristicRef.current = null;
+      console.error('Stick Em robot connection failed:', error);
+      setIsStickEmConnected(false);
+      stickEmCharacteristicRef.current = null;
       return false;
     }
-  }, [LIGHTS_SERVICE_UUID, LIGHTS_CHAR_UUID, handleLightsDisconnection, t]);
+  }, [STICKEM_SERVICE_UUID, STICKEM_CHAR_UUID, handleStickEmDisconnection, t]);
 
   // writeLightsByte removed (unused)
 
   const connectAccessories = useCallback(async () => {
     setIsConnectingAccessories(true);
     try {
-      const success = await connectToLightsDevice();
+      const success = await connectToStickEmDevice();
       if (success) {
-        console.log('Accessories connected successfully');
+        console.log('Stick Em robot connected successfully');
       }
     } catch (error) {
-      console.error('Failed to connect accessories:', error);
+      console.error('Failed to connect Stick Em robot:', error);
     } finally {
       setIsConnectingAccessories(false);
     }
-  }, [connectToLightsDevice]);
+  }, [connectToStickEmDevice]);
 
-  // Send command to Stick 'Em robot using the existing lights connection
+  // Send command to Stick 'Em robot
   const sendStickEmCommand = useCallback(async (command: string) => {
-    const ch = lightsCharacteristicRef.current;
+    const ch = stickEmCharacteristicRef.current;
     if (!ch || typeof ch.writeValue !== 'function') {
-      console.log('Stick Em robot not connected (via accessories)');
+      console.log('Stick Em robot not connected');
       return false;
     }
     
@@ -939,8 +939,8 @@ const CommunicationInterface: React.FC = () => {
   const handleOptionClick = (option: Option) => {
     // For robot control commands, only check if robot is connected (not neural drive)
     if (['forward', 'stop', 'backward', 'forwardLeft', 'forwardRight'].includes(option.id)) {
-      if (!isLightsConnected) {
-        alert('Please connect to robot first!');
+      if (!isStickEmConnected) {
+        alert('Please connect to Stick Em robot first!');
         return;
       }
     } else {
@@ -977,8 +977,7 @@ const CommunicationInterface: React.FC = () => {
       sendStickEmCommand('mv:2000:1500:2000:1500:-:-:-:-:-,');
     }
   };
-  // test commit
-
+  
   // Run side-effects for neural activations
   useEffect(() => {
     if (!pendingActionOptionId) return;
@@ -1156,7 +1155,7 @@ const CommunicationInterface: React.FC = () => {
                   onClick={connectAccessories}
                   disabled={isConnectingAccessories}
                   className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                    isLightsConnected
+                    isStickEmConnected
                       ? 'bg-green-500 hover:bg-green-600 text-white'
                       : 'bg-purple-600 hover:bg-purple-700 text-white'
                   } ${isConnectingAccessories ? 'opacity-75' : ''}`}
@@ -1164,12 +1163,12 @@ const CommunicationInterface: React.FC = () => {
                   {isConnectingAccessories ? (
                     <span className="flex items-center">
                       <span className="animate-spin mr-2">↻</span>
-                      Connecting Robot...
+                      Connecting Stick Em...
                     </span>
-                  ) : isLightsConnected ? (
-                    'Robot Connected'
+                  ) : isStickEmConnected ? (
+                    'Stick Em Connected'
                   ) : (
-                    'Connect Robot'
+                    'Connect Stick Em'
                   )}
                 </button>
               </div>
@@ -1213,14 +1212,14 @@ const CommunicationInterface: React.FC = () => {
           </div>
         )}
 
-        {showLightsMessage && (
+        {showStickEmMessage && (
           <div className="mb-6 text-center">
             <div className={`inline-block px-4 py-2 rounded-lg text-sm ${
               isDarkMode 
                 ? 'bg-orange-950 border border-orange-700 text-orange-300' 
                 : 'bg-orange-50 border border-orange-200 text-orange-700'
             }`}>
-              {t.noLightsDeviceConnected}
+              No Stick Em robot connected
             </div>
           </div>
         )}
@@ -1252,7 +1251,7 @@ const CommunicationInterface: React.FC = () => {
             const isActivated = activeSelection === option.id;
             
             // Determine if card should be disabled
-            const isDisabled = isRobotCard ? !isLightsConnected : !isConnected;
+            const isDisabled = isRobotCard ? !isStickEmConnected : !isConnected;
             
             // Debug logging for visual state
             if (isCurrentMenuOption) {
