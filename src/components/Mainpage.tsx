@@ -825,8 +825,6 @@ const CommunicationInterface: React.FC = () => {
     }
   }, [STICKEM_SERVICE_UUID, STICKEM_CHAR_UUID, handleStickEmDisconnection, t]);
 
-  // writeLightsByte removed (unused)
-
   const connectAccessories = useCallback(async () => {
     setIsConnectingAccessories(true);
     try {
@@ -845,13 +843,14 @@ const CommunicationInterface: React.FC = () => {
   const sendStickEmCommand = useCallback(async (command: string) => {
     const now = Date.now();
     if (now - lastServoSendRef.current < SEND_INTERVAL_MS) {
+      console.log('🚫 Command throttled (too soon):', command);
       return false;
     }
     lastServoSendRef.current = now;
 
     const ch = stickEmCharacteristicRef.current;
     if (!ch || typeof ch.writeValue !== 'function') {
-      console.log('Stick Em robot not connected');
+      console.log('❌ Stick Em robot not connected - no characteristic');
       return false;
     }
     
@@ -859,14 +858,29 @@ const CommunicationInterface: React.FC = () => {
       const encoder = new TextEncoder();
       const data = encoder.encode(command);
       
+      console.log('📤 Sending to Stick Em robot:', {
+        command,
+        bytes: Array.from(data),
+        length: data.length,
+        characteristic: ch
+      });
+      
       await ch.writeValue(data);
-      console.log('Sent to Stick Em robot:', command);
+      console.log('✅ Successfully sent to Stick Em robot:', command);
       return true;
     } catch (e) {
-      console.error('Stick Em command send failed:', e);
+      console.error('❌ Stick Em command send failed:', e);
       return false;
     }
   }, []);
+
+  // Test BLE connection with a simple command
+  const testStickEmConnection = useCallback(async () => {
+    console.log('🧪 Testing Stick Em connection...');
+    const result = await sendStickEmCommand('test,');
+    console.log('🧪 Test result:', result);
+    return result;
+  }, [sendStickEmCommand]);
 
   // toggleLights removed (unused)
 
@@ -1176,6 +1190,15 @@ const CommunicationInterface: React.FC = () => {
                     'Connect Stick Em'
                   )}
                 </button>
+
+                {isStickEmConnected && (
+                  <button
+                    onClick={testStickEmConnection}
+                    className="px-3 py-2 rounded-lg font-medium transition-all bg-yellow-500 hover:bg-yellow-600 text-white text-sm"
+                  >
+                    Test
+                  </button>
+                )}
               </div>
 
               {/* Theme Toggle */}
