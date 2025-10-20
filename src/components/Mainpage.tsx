@@ -832,7 +832,7 @@ const CommunicationInterface: React.FC = () => {
     }
   }, [connectToLightsDevice]);
 
-  // Send command to Stick 'Em robot with filtering using existing lights connection
+  // Send command to Stick 'Em robot using the existing lights connection
   const sendStickEmCommand = useCallback(async (command: string) => {
     const ch = lightsCharacteristicRef.current;
     if (!ch || typeof ch.writeValue !== 'function') {
@@ -841,13 +841,11 @@ const CommunicationInterface: React.FC = () => {
     }
     
     try {
-      // Add the filtering character (U+2800) at the beginning to ensure only Stick 'Em PCBs respond
-      const filteredCommand = '\u2800' + command;
       const encoder = new TextEncoder();
-      const data = encoder.encode(filteredCommand);
+      const data = encoder.encode(command);
       
       await ch.writeValue(data);
-      console.log('Sent to Stick Em robot:', filteredCommand);
+      console.log('Sent to Stick Em robot:', command);
       return true;
     } catch (e) {
       console.error('Stick Em command send failed:', e);
