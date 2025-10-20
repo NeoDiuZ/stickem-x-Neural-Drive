@@ -977,6 +977,7 @@ const CommunicationInterface: React.FC = () => {
       sendStickEmCommand('mv:2000:1500:2000:1500:-:-:-:-:-,');
     }
   };
+  // test commit
 
   // Run side-effects for neural activations
   useEffect(() => {
