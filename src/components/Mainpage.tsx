@@ -311,7 +311,8 @@ declare global {
   interface Navigator {
     bluetooth: {
       requestDevice(options: {
-        filters: Array<{ name?: string; services?: string[] }>;
+        filters?: Array<{ name?: string; services?: string[] }>;
+        acceptAllDevices?: boolean;
         optionalServices?: string[];
       }): Promise<BluetoothDevice>;
     };
@@ -787,7 +788,7 @@ const CommunicationInterface: React.FC = () => {
       }
 
       const device = await navigator.bluetooth.requestDevice({
-        filters: [{ services: [STICKEM_SERVICE_UUID] }],
+        acceptAllDevices: true,
         optionalServices: [STICKEM_SERVICE_UUID]
       }) as BluetoothDevice;
 
