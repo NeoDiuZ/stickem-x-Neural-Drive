@@ -939,15 +939,18 @@ const CommunicationInterface: React.FC = () => {
   };
 
   const handleOptionClick = (option: Option) => {
-    if (!isConnected) {
-      alert(t.pleaseConnect);
-      return;
-    }
-    
-    // For robot commands, also check if accessories (robot) is connected
-    if (['forward', 'stop', 'backward', 'forwardLeft', 'forwardRight'].includes(option.id) && !isLightsConnected) {
-      alert('Please connect to robot first!');
-      return;
+    // For robot control commands, only check if robot is connected (not neural drive)
+    if (['forward', 'stop', 'backward', 'forwardLeft', 'forwardRight'].includes(option.id)) {
+      if (!isLightsConnected) {
+        alert('Please connect to robot first!');
+        return;
+      }
+    } else {
+      // For non-robot commands, require neural drive connection
+      if (!isConnected) {
+        alert(t.pleaseConnect);
+        return;
+      }
     }
 
     setSelectedOption(selectedOption === option.id ? null : option.id);
@@ -1244,9 +1247,13 @@ const CommunicationInterface: React.FC = () => {
           {options.map((option, index) => {
             const isCurrentMenuOption = menuActive && !showYouTubeView && !ytModal.open && currentMenuIndex === index + 1;
             const isCustomCard = option.id.startsWith('custom-');
+            const isRobotCard = ['forward', 'stop', 'backward', 'forwardLeft', 'forwardRight'].includes(option.id);
             // Purple for S mode iteration, green for A mode activation
             const isIterating = isCurrentMenuOption && !activeSelection;
             const isActivated = activeSelection === option.id;
+            
+            // Determine if card should be disabled
+            const isDisabled = isRobotCard ? !isLightsConnected : !isConnected;
             
             // Debug logging for visual state
             if (isCurrentMenuOption) {
@@ -1262,7 +1269,7 @@ const CommunicationInterface: React.FC = () => {
                   hover:scale-105 hover:shadow-lg rounded-xl p-6 border-2
                   ${isIterating ? 'ring-4 ring-purple-400/50' : ''}
                   ${isActivated ? 'border-green-400 bg-green-50 scale-105' : ''}
-                  ${!isConnected ? 'opacity-50 cursor-not-allowed' : ''}
+                  ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}
                 `}
               >
                 {/* Remove button for custom cards */}
