@@ -383,11 +383,19 @@ const CommunicationInterface: React.FC = () => {
   // Stick 'Em Robot BLE (using UART service)
   const STICKEM_SERVICE_UUID = '0000ffe0-0000-1000-8000-00805f9b34fb'; // 0xFFE0 in proper format
   const STICKEM_CHAR_UUID = '0000ffe1-0000-1000-8000-00805f9b34fb';   // 0xFFE1 in proper format
+  // Servo command constants and throttle interval
+  const SEND_INTERVAL_MS = 500;
+  const SERVO_CMD_FORWARD = 'mv:2000:1000:2000:1000:-:-:-:-:-,';
+  const SERVO_CMD_IDLE = 'stopAll,';
+  const SERVO_CMD_REVERSE = 'mv:1000:2000:1000:2000:-:-:-:-:-,';
+  const SERVO_CMD_FORWARD_LEFT = 'mv:1500:1000:1500:1000:-:-:-:-:-,';
+  const SERVO_CMD_FORWARD_RIGHT = 'mv:2000:1500:2000:1500:-:-:-:-:-,';
   const connectedStickEmDeviceRef = useRef<BluetoothDevice | null>(null);
   const stickEmCharacteristicRef = useRef<BluetoothRemoteGATTCharacteristic | null>(null);
   const [isStickEmConnected, setIsStickEmConnected] = useState(false);
   const [isConnectingAccessories, setIsConnectingAccessories] = useState(false);
   const [showStickEmMessage] = useState(false);
+  const lastServoSendRef = useRef<number>(0);
 
   // Stick 'Em Robot will use the existing lights connection system
 
@@ -833,8 +841,14 @@ const CommunicationInterface: React.FC = () => {
     }
   }, [connectToStickEmDevice]);
 
-  // Send command to Stick 'Em robot
+  // Send command to Stick 'Em robot (throttled)
   const sendStickEmCommand = useCallback(async (command: string) => {
+    const now = Date.now();
+    if (now - lastServoSendRef.current < SEND_INTERVAL_MS) {
+      return false;
+    }
+    lastServoSendRef.current = now;
+
     const ch = stickEmCharacteristicRef.current;
     if (!ch || typeof ch.writeValue !== 'function') {
       console.log('Stick Em robot not connected');
@@ -957,25 +971,20 @@ const CommunicationInterface: React.FC = () => {
     
     // Handle robot control commands
     if (option.id === 'forward') {
-      // Send forward command: 'mv:2000:1000:2000:1000:-:-:-:-:-,'
       console.log('Sending Forward command');
-      sendStickEmCommand('mv:2000:1000:2000:1000:-:-:-:-:-,');
+      sendStickEmCommand(SERVO_CMD_FORWARD);
     } else if (option.id === 'stop') {
-      // Send stop command: 'stopAll,'
       console.log('Sending Stop command');
-      sendStickEmCommand('stopAll,');
+      sendStickEmCommand(SERVO_CMD_IDLE);
     } else if (option.id === 'backward') {
-      // Send backward command: 'mv:1000:2000:1000:2000:-:-:-:-:-,'
       console.log('Sending Backward command');
-      sendStickEmCommand('mv:1000:2000:1000:2000:-:-:-:-:-,');
+      sendStickEmCommand(SERVO_CMD_REVERSE);
     } else if (option.id === 'forwardLeft') {
-      // Send forward left command: 'mv:1500:1000:1500:1000:-:-:-:-:-,'
       console.log('Sending Forward Left command');
-      sendStickEmCommand('mv:1500:1000:1500:1000:-:-:-:-:-,');
+      sendStickEmCommand(SERVO_CMD_FORWARD_LEFT);
     } else if (option.id === 'forwardRight') {
-      // Send forward right command: 'mv:2000:1500:2000:1500:-:-:-:-:-,'
       console.log('Sending Forward Right command');
-      sendStickEmCommand('mv:2000:1500:2000:1500:-:-:-:-:-,');
+      sendStickEmCommand(SERVO_CMD_FORWARD_RIGHT);
     }
   };
   
@@ -990,25 +999,20 @@ const CommunicationInterface: React.FC = () => {
     
     // Handle robot control commands
     if (pendingActionOptionId === 'forward') {
-      // Send forward command: 'mv:2000:1000:2000:1000:-:-:-:-:-,'
       console.log('Neural activation: Sending Forward command');
-      sendStickEmCommand('mv:2000:1000:2000:1000:-:-:-:-:-,');
+      sendStickEmCommand(SERVO_CMD_FORWARD);
     } else if (pendingActionOptionId === 'stop') {
-      // Send stop command: 'stopAll,'
       console.log('Neural activation: Sending Stop command');
-      sendStickEmCommand('stopAll,');
+      sendStickEmCommand(SERVO_CMD_IDLE);
     } else if (pendingActionOptionId === 'backward') {
-      // Send backward command: 'mv:1000:2000:1000:2000:-:-:-:-:-,'
       console.log('Neural activation: Sending Backward command');
-      sendStickEmCommand('mv:1000:2000:1000:2000:-:-:-:-:-,');
+      sendStickEmCommand(SERVO_CMD_REVERSE);
     } else if (pendingActionOptionId === 'forwardLeft') {
-      // Send forward left command: 'mv:1500:1000:1500:1000:-:-:-:-:-,'
       console.log('Neural activation: Sending Forward Left command');
-      sendStickEmCommand('mv:1500:1000:1500:1000:-:-:-:-:-,');
+      sendStickEmCommand(SERVO_CMD_FORWARD_LEFT);
     } else if (pendingActionOptionId === 'forwardRight') {
-      // Send forward right command: 'mv:2000:1500:2000:1500:-:-:-:-:-,'
       console.log('Neural activation: Sending Forward Right command');
-      sendStickEmCommand('mv:2000:1500:2000:1500:-:-:-:-:-,');
+      sendStickEmCommand(SERVO_CMD_FORWARD_RIGHT);
     }
     
     setPendingActionOptionId(null);
