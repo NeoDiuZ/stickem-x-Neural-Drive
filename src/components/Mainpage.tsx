@@ -1,7 +1,7 @@
 'use client'
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
-import { Utensils, Users, Droplets, Sun, Moon, WifiOff, HelpCircle, Brain, Plus, X, Globe, Heart, Home, Star, Car, Phone, Music, Coffee, Bed, Sun as SunIcon, Zap, Camera, Gift, Clock, MapPin, Thermometer, Mic, MessageCircle, Play, Bus, Bike, Plane, Key, Building2, Stethoscope, Users2, Briefcase, GraduationCap, Dumbbell, Pill, Frown, Smile, CloudRain, AlertTriangle, Activity, GamepadIcon, Monitor, Youtube, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Square } from 'lucide-react';
+import { Utensils, Users, Droplets, HelpCircle, X, Heart, Home, Star, Car, Phone, Music, Coffee, Bed, Sun as SunIcon, Zap, Camera, Gift, Clock, MapPin, Thermometer, Mic, MessageCircle, Play, Bus, Bike, Plane, Key, Building2, Stethoscope, Users2, Briefcase, GraduationCap, Dumbbell, Pill, Frown, Smile, CloudRain, AlertTriangle, Activity, GamepadIcon, Monitor, Youtube } from 'lucide-react';
 
 interface Option {
   id: string;
@@ -340,7 +340,7 @@ interface BluetoothRemoteGATTCharacteristic extends EventTarget {
 const CommunicationInterface: React.FC = () => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState<Language>('en');
-  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+  const [_showLanguageDropdown, setShowLanguageDropdown] = useState(false);
 
   // Initialize language from localStorage
   useEffect(() => {
@@ -362,7 +362,7 @@ const CommunicationInterface: React.FC = () => {
   const [currentMenuIndex, setCurrentMenuIndex] = useState(0);
   const [menuActive, setMenuActive] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [_connectionError, setConnectionError] = useState<string | null>(null);
   const [showAddCard, setShowAddCard] = useState(false);
   const connectedDeviceRef = useRef<BluetoothDevice | null>(null);
   const [pendingActionOptionId, setPendingActionOptionId] = useState<string | null>(null);
@@ -394,9 +394,9 @@ const CommunicationInterface: React.FC = () => {
   const stickEmCharacteristicRef = useRef<BluetoothRemoteGATTCharacteristic | null>(null);
   const [isStickEmConnected, setIsStickEmConnected] = useState(false);
   const [isConnectingAccessories, setIsConnectingAccessories] = useState(false);
-  const [showStickEmMessage] = useState(false);
+  const [_showStickEmMessage] = useState(false);
   const lastServoSendRef = useRef<number>(0);
-  const [moveDurationSec, setMoveDurationSec] = useState<number>(1);
+  const [moveDurationSec, _setMoveDurationSec] = useState<number>(1);
   const [forwardDurationSec, setForwardDurationSec] = useState<number>(1);
   const [leftDurationSec, setLeftDurationSec] = useState<number>(1);
   const [rightDurationSec, setRightDurationSec] = useState<number>(1);
@@ -886,7 +886,7 @@ const CommunicationInterface: React.FC = () => {
   }, [clearPendingAutoStop, moveDurationSec, sendStickEmCommand]);
 
   // Test BLE connection with a simple command
-  const testStickEmConnection = useCallback(async () => {
+  const _testStickEmConnection = useCallback(async () => {
     console.log('🧪 Testing Stick Em connection...');
     const result = await sendStickEmCommand('test,');
     console.log('🧪 Test result:', result);
@@ -976,7 +976,7 @@ const CommunicationInterface: React.FC = () => {
     }
   };
 
-  const handleOptionClick = (option: Option) => {
+  const _handleOptionClick = (option: Option) => {
     // All remaining options require neural drive connection
     if (!isConnected) {
       alert(t.pleaseConnect);
@@ -1029,12 +1029,12 @@ const CommunicationInterface: React.FC = () => {
     setPendingActionOptionId(null);
   }, [pendingActionOptionId, ytModal.open, showYouTubeView, sendStickEmCommand, options, isStickEmConnected, sendMovementWithAutoStop, clearPendingAutoStop]);
 
-  const toggleTheme = () => {
+  const _toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
   };
 
   // Language selection handler
-  const handleLanguageChange = (language: Language) => {
+  const _handleLanguageChange = (language: Language) => {
     setCurrentLanguage(language);
     setShowLanguageDropdown(false);
   };
@@ -1053,7 +1053,7 @@ const CommunicationInterface: React.FC = () => {
 
 
   // Remove card functionality
-  const removeCard = (cardId: string) => {
+  const _removeCard = (cardId: string) => {
     setOptions(prev => prev.filter(option => option.id !== cardId));
     // Reset selection if the removed card was selected
     if (selectedOption === cardId) {
@@ -1396,7 +1396,7 @@ const CommunicationInterface: React.FC = () => {
 
               <div className="mt-2">
                 <div className="text-white/90 text-sm font-medium text-center whitespace-nowrap">
-                  Connect<br/>Stick 'Em
+                  Connect<br/>Stick &apos;Em
                 </div>
               </div>
 
@@ -1408,7 +1408,7 @@ const CommunicationInterface: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <div className={`w-3 h-3 rounded-full ${isStickEmConnected ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`}></div>
-                  <span className="text-white/80 text-xs">Stick 'Em</span>
+                  <span className="text-white/80 text-xs">Stick &apos;Em</span>
                 </div>
               </div>
             </div>
@@ -1416,7 +1416,7 @@ const CommunicationInterface: React.FC = () => {
 
           {/* Title at Bottom */}
           <div className="w-full pb-6 pt-4 flex justify-center">
-            <h2 className="text-white text-xl font-bold text-center">NeuralDrive x Stick 'Em™</h2>
+            <h2 className="text-white text-xl font-bold text-center">NeuralDrive x Stick &apos;Em™</h2>
           </div>
         </div>
       </main>
