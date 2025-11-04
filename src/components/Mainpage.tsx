@@ -340,7 +340,7 @@ interface BluetoothRemoteGATTCharacteristic extends EventTarget {
 const CommunicationInterface: React.FC = () => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState<Language>('en');
-  const [_showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+  const [, setShowLanguageDropdown] = useState(false);
 
   // Initialize language from localStorage
   useEffect(() => {
@@ -362,7 +362,7 @@ const CommunicationInterface: React.FC = () => {
   const [currentMenuIndex, setCurrentMenuIndex] = useState(0);
   const [menuActive, setMenuActive] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [_connectionError, setConnectionError] = useState<string | null>(null);
+  const [, setConnectionError] = useState<string | null>(null);
   const [showAddCard, setShowAddCard] = useState(false);
   const connectedDeviceRef = useRef<BluetoothDevice | null>(null);
   const [pendingActionOptionId, setPendingActionOptionId] = useState<string | null>(null);
@@ -394,9 +394,8 @@ const CommunicationInterface: React.FC = () => {
   const stickEmCharacteristicRef = useRef<BluetoothRemoteGATTCharacteristic | null>(null);
   const [isStickEmConnected, setIsStickEmConnected] = useState(false);
   const [isConnectingAccessories, setIsConnectingAccessories] = useState(false);
-  const [_showStickEmMessage] = useState(false);
   const lastServoSendRef = useRef<number>(0);
-  const [moveDurationSec, _setMoveDurationSec] = useState<number>(1);
+  const [moveDurationSec] = useState<number>(1);
   const [forwardDurationSec, setForwardDurationSec] = useState<number>(1);
   const [leftDurationSec, setLeftDurationSec] = useState<number>(1);
   const [rightDurationSec, setRightDurationSec] = useState<number>(1);
@@ -885,13 +884,13 @@ const CommunicationInterface: React.FC = () => {
     }, Math.max(1, Math.min(3, moveDurationSec)) * 1000);
   }, [clearPendingAutoStop, moveDurationSec, sendStickEmCommand]);
 
-  // Test BLE connection with a simple command
-  const _testStickEmConnection = useCallback(async () => {
-    console.log('🧪 Testing Stick Em connection...');
-    const result = await sendStickEmCommand('test,');
-    console.log('🧪 Test result:', result);
-    return result;
-  }, [sendStickEmCommand]);
+  // Test BLE connection with a simple command (unused, kept for future use)
+  // const testStickEmConnection = useCallback(async () => {
+  //   console.log('🧪 Testing Stick Em connection...');
+  //   const result = await sendStickEmCommand('test,');
+  //   console.log('🧪 Test result:', result);
+  //   return result;
+  // }, [sendStickEmCommand]);
 
   // toggleLights removed (unused)
 
@@ -976,16 +975,16 @@ const CommunicationInterface: React.FC = () => {
     }
   };
 
-  const _handleOptionClick = (option: Option) => {
-    // All remaining options require neural drive connection
-    if (!isConnected) {
-      alert(t.pleaseConnect);
-      return;
-    }
-
-    setSelectedOption(selectedOption === option.id ? null : option.id);
-    playSound(option.soundFile);
-  };
+  // Handle option click (unused, kept for future use)
+  // const handleOptionClick = (option: Option) => {
+  //   // All remaining options require neural drive connection
+  //   if (!isConnected) {
+  //     alert(t.pleaseConnect);
+  //     return;
+  //   }
+  //   setSelectedOption(selectedOption === option.id ? null : option.id);
+  //   playSound(option.soundFile);
+  // };
   
   // Run side-effects for neural activations
   useEffect(() => {
@@ -1029,15 +1028,16 @@ const CommunicationInterface: React.FC = () => {
     setPendingActionOptionId(null);
   }, [pendingActionOptionId, ytModal.open, showYouTubeView, sendStickEmCommand, options, isStickEmConnected, sendMovementWithAutoStop, clearPendingAutoStop]);
 
-  const _toggleTheme = () => {
-    setIsDarkMode(!isDarkMode);
-  };
+  // Toggle theme (unused, kept for future use)
+  // const toggleTheme = () => {
+  //   setIsDarkMode(!isDarkMode);
+  // };
 
-  // Language selection handler
-  const _handleLanguageChange = (language: Language) => {
-    setCurrentLanguage(language);
-    setShowLanguageDropdown(false);
-  };
+  // Language selection handler (unused, kept for future use)
+  // const handleLanguageChange = (language: Language) => {
+  //   setCurrentLanguage(language);
+  //   setShowLanguageDropdown(false);
+  // };
 
   // Add new card functionality
   const addNewCard = (newCard: Omit<Option, 'id'>) => {
@@ -1052,14 +1052,14 @@ const CommunicationInterface: React.FC = () => {
   };
 
 
-  // Remove card functionality
-  const _removeCard = (cardId: string) => {
-    setOptions(prev => prev.filter(option => option.id !== cardId));
-    // Reset selection if the removed card was selected
-    if (selectedOption === cardId) {
-      setSelectedOption(null);
-    }
-  };
+  // Remove card functionality (unused, kept for future use)
+  // const removeCard = (cardId: string) => {
+  //   setOptions(prev => prev.filter(option => option.id !== cardId));
+  //   // Reset selection if the removed card was selected
+  //   if (selectedOption === cardId) {
+  //     setSelectedOption(null);
+  //   }
+  // };
 
   return (
     <div className="min-h-screen bg-purple-900">
