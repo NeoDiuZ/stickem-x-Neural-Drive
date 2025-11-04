@@ -1,7 +1,7 @@
 'use client'
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
-import { Utensils, Users, Droplets, Sun, Moon, WifiOff, HelpCircle, Brain, Plus, X, Globe, Heart, Home, Star, Car, Phone, Music, Coffee, Bed, Sun as SunIcon, Zap, Camera, Gift, Clock, MapPin, Thermometer, Mic, MessageCircle, Play, Bus, Bike, Plane, Key, Building2, Stethoscope, Users2, Briefcase, GraduationCap, Dumbbell, Pill, Frown, Smile, CloudRain, AlertTriangle, Activity, GamepadIcon, Monitor, Youtube } from 'lucide-react';
+import { Utensils, Users, Droplets, Sun, Moon, WifiOff, HelpCircle, Brain, Plus, X, Globe, Heart, Home, Star, Car, Phone, Music, Coffee, Bed, Sun as SunIcon, Zap, Camera, Gift, Clock, MapPin, Thermometer, Mic, MessageCircle, Play, Bus, Bike, Plane, Key, Building2, Stethoscope, Users2, Briefcase, GraduationCap, Dumbbell, Pill, Frown, Smile, CloudRain, AlertTriangle, Activity, GamepadIcon, Monitor, Youtube, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Square } from 'lucide-react';
 
 interface Option {
   id: string;
@@ -396,6 +396,39 @@ const CommunicationInterface: React.FC = () => {
   const [isConnectingAccessories, setIsConnectingAccessories] = useState(false);
   const [showStickEmMessage] = useState(false);
   const lastServoSendRef = useRef<number>(0);
+  const [moveDurationSec, setMoveDurationSec] = useState<number>(1);
+  const [forwardDurationSec, setForwardDurationSec] = useState<number>(1);
+  const [leftDurationSec, setLeftDurationSec] = useState<number>(1);
+  const [rightDurationSec, setRightDurationSec] = useState<number>(1);
+  const [backwardDurationSec, setBackwardDurationSec] = useState<number>(1);
+  const movementStopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [ipCameraUrl, setIpCameraUrl] = useState<string>('');
+
+  // Static game state for display (non-playable)
+  const [gameOver] = useState(false);
+  const [score] = useState(1250);
+  const [shipPosition] = useState({ x: 50, y: 80 });
+  const [alienShips] = useState<Array<{ id: number; x: number; y: number }>>([
+    { id: 1, x: 30, y: 20 },
+    { id: 2, x: 70, y: 15 }
+  ]);
+  const [bullets] = useState<Array<{ id: number; x: number; y: number }>>([
+    { id: 1, x: 50, y: 60 },
+    { id: 2, x: 48, y: 45 }
+  ]);
+  const [starPositions] = useState(() => {
+    return Array.from({ length: 30 }, (_, i) => ({
+      x: (i * 7) % 100,
+      y: (i * 11) % 100,
+      delay: 0,
+      duration: 1
+    }));
+  });
+
+  // Dummy reset function (does nothing since game is static)
+  const resetGame = useCallback(() => {
+    // Game is static, no reset needed
+  }, []);
 
   // Stick 'Em Robot will use the existing lights connection system
 
@@ -419,48 +452,9 @@ const CommunicationInterface: React.FC = () => {
     return formatted;
   };
 
-  // Default options - robot control cards
+  // Default options - no robot control cards (handled by D-pad)
   const getDefaultOptions = useCallback((): Option[] => [
-    {
-      id: 'forward',
-      label: 'Forward',
-      icon: <Car size={40} strokeWidth={1.5} />,
-      color: 'bg-green-500',
-      lightColor: 'bg-green-400',
-      soundFile: 'select.mp3'
-    },
-    {
-      id: 'stop',
-      label: 'Stop',
-      icon: <Zap size={40} strokeWidth={1.5} />,
-      color: 'bg-red-500',
-      lightColor: 'bg-red-400',
-      soundFile: 'select.mp3'
-    },
-    {
-      id: 'backward',
-      label: 'Backward',
-      icon: <Car size={40} strokeWidth={1.5} style={{ transform: 'rotate(180deg)' }} />,
-      color: 'bg-orange-500',
-      lightColor: 'bg-orange-400',
-      soundFile: 'select.mp3'
-    },
-    {
-      id: 'forwardLeft',
-      label: 'Forward Left',
-      icon: <Car size={40} strokeWidth={1.5} style={{ transform: 'rotate(-45deg)' }} />,
-      color: 'bg-blue-500',
-      lightColor: 'bg-blue-400',
-      soundFile: 'select.mp3'
-    },
-    {
-      id: 'forwardRight',
-      label: 'Forward Right',
-      icon: <Car size={40} strokeWidth={1.5} style={{ transform: 'rotate(45deg)' }} />,
-      color: 'bg-purple-500',
-      lightColor: 'bg-purple-400',
-      soundFile: 'select.mp3'
-    }
+    // No default robot control cards - movement is handled by D-pad
   ], []);
 
   // Dynamic options state
@@ -874,6 +868,23 @@ const CommunicationInterface: React.FC = () => {
     }
   }, []);
 
+  const clearPendingAutoStop = useCallback(() => {
+    if (movementStopTimeoutRef.current) {
+      clearTimeout(movementStopTimeoutRef.current);
+      movementStopTimeoutRef.current = null;
+    }
+  }, []);
+
+  const sendMovementWithAutoStop = useCallback(async (command: string) => {
+    clearPendingAutoStop();
+    const sent = await sendStickEmCommand(command);
+    if (!sent) return;
+    movementStopTimeoutRef.current = setTimeout(() => {
+      sendStickEmCommand(SERVO_CMD_IDLE);
+      movementStopTimeoutRef.current = null;
+    }, Math.max(1, Math.min(3, moveDurationSec)) * 1000);
+  }, [clearPendingAutoStop, moveDurationSec, sendStickEmCommand]);
+
   // Test BLE connection with a simple command
   const testStickEmConnection = useCallback(async () => {
     console.log('🧪 Testing Stick Em connection...');
@@ -966,40 +977,14 @@ const CommunicationInterface: React.FC = () => {
   };
 
   const handleOptionClick = (option: Option) => {
-    // For robot control commands, only check if robot is connected (not neural drive)
-    if (['forward', 'stop', 'backward', 'forwardLeft', 'forwardRight'].includes(option.id)) {
-      if (!isStickEmConnected) {
-        alert('Please connect to Stick Em robot first!');
-        return;
-      }
-    } else {
-      // For non-robot commands, require neural drive connection
-      if (!isConnected) {
-        alert(t.pleaseConnect);
-        return;
-      }
+    // All remaining options require neural drive connection
+    if (!isConnected) {
+      alert(t.pleaseConnect);
+      return;
     }
 
     setSelectedOption(selectedOption === option.id ? null : option.id);
     playSound(option.soundFile);
-    
-    // Handle robot control commands
-    if (option.id === 'forward') {
-      console.log('Sending Forward command');
-      sendStickEmCommand(SERVO_CMD_FORWARD);
-    } else if (option.id === 'stop') {
-      console.log('Sending Stop command');
-      sendStickEmCommand(SERVO_CMD_IDLE);
-    } else if (option.id === 'backward') {
-      console.log('Sending Backward command');
-      sendStickEmCommand(SERVO_CMD_REVERSE);
-    } else if (option.id === 'forwardLeft') {
-      console.log('Sending Forward Left command');
-      sendStickEmCommand(SERVO_CMD_FORWARD_LEFT);
-    } else if (option.id === 'forwardRight') {
-      console.log('Sending Forward Right command');
-      sendStickEmCommand(SERVO_CMD_FORWARD_RIGHT);
-    }
   };
   
   // Run side-effects for neural activations
@@ -1011,26 +996,38 @@ const CommunicationInterface: React.FC = () => {
       return;
     }
     
-    // Handle robot control commands
-    if (pendingActionOptionId === 'forward') {
-      console.log('Neural activation: Sending Forward command');
-      sendStickEmCommand(SERVO_CMD_FORWARD);
-    } else if (pendingActionOptionId === 'stop') {
-      console.log('Neural activation: Sending Stop command');
-      sendStickEmCommand(SERVO_CMD_IDLE);
-    } else if (pendingActionOptionId === 'backward') {
-      console.log('Neural activation: Sending Backward command');
-      sendStickEmCommand(SERVO_CMD_REVERSE);
-    } else if (pendingActionOptionId === 'forwardLeft') {
-      console.log('Neural activation: Sending Forward Left command');
-      sendStickEmCommand(SERVO_CMD_FORWARD_LEFT);
-    } else if (pendingActionOptionId === 'forwardRight') {
-      console.log('Neural activation: Sending Forward Right command');
-      sendStickEmCommand(SERVO_CMD_FORWARD_RIGHT);
+    // Handle neural activations for D-pad movements
+    // Map neural activations to D-pad movements based on option index
+    const optionIndex = options.findIndex(opt => opt.id === pendingActionOptionId);
+    if (optionIndex >= 0 && isStickEmConnected) {
+      // Map first 5 neural activations to D-pad movements
+      switch (optionIndex) {
+        case 0: // First option -> Forward
+          console.log('Neural activation: Sending Forward command');
+          sendMovementWithAutoStop(SERVO_CMD_FORWARD);
+          break;
+        case 1: // Second option -> Forward Left
+          console.log('Neural activation: Sending Forward Left command');
+          sendMovementWithAutoStop(SERVO_CMD_FORWARD_LEFT);
+          break;
+        case 2: // Third option -> Stop
+          console.log('Neural activation: Sending Stop command');
+          clearPendingAutoStop();
+          sendStickEmCommand(SERVO_CMD_IDLE);
+          break;
+        case 3: // Fourth option -> Forward Right
+          console.log('Neural activation: Sending Forward Right command');
+          sendMovementWithAutoStop(SERVO_CMD_FORWARD_RIGHT);
+          break;
+        case 4: // Fifth option -> Backward
+          console.log('Neural activation: Sending Backward command');
+          sendMovementWithAutoStop(SERVO_CMD_REVERSE);
+          break;
+      }
     }
     
     setPendingActionOptionId(null);
-  }, [pendingActionOptionId, ytModal.open, showYouTubeView, sendStickEmCommand]);
+  }, [pendingActionOptionId, ytModal.open, showYouTubeView, sendStickEmCommand, options, isStickEmConnected, sendMovementWithAutoStop, clearPendingAutoStop]);
 
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
@@ -1054,6 +1051,7 @@ const CommunicationInterface: React.FC = () => {
     setShowAddCard(false);
   };
 
+
   // Remove card functionality
   const removeCard = (cardId: string) => {
     setOptions(prev => prev.filter(option => option.id !== cardId));
@@ -1064,283 +1062,362 @@ const CommunicationInterface: React.FC = () => {
   };
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'bg-slate-900' : 'bg-gradient-to-br from-blue-50 via-white to-purple-50'}`}>
-      {/* Header */}
-      <header className={`border-b backdrop-blur-sm sticky top-0 z-50 ${isDarkMode ? 'border-gray-700 bg-slate-900/80' : 'border-gray-200 bg-white/80'}`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-3">
-              <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-2 rounded-lg">
-                <Brain className="h-6 w-6 text-white" />
-              </div>
-              <span className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{t.appTitle}</span>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              {/* Connection Status */}
-              <div className={`flex items-center space-x-3 px-4 py-2 rounded-lg border ${
-                isConnected 
-                  ? 'border-green-400 bg-green-50 text-green-700' 
-                  : isDarkMode 
-                    ? 'border-red-400 bg-red-950 text-red-400'
-                    : 'border-red-400 bg-red-50 text-red-700'
-              }`}>
-                <div className="relative">
-                  {isConnected ? (
-                    <WifiOff size={16} className="text-green-500" />
-                  ) : isConnecting ? (
-                    <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <WifiOff size={16} className="text-red-400" />
-                  )}
-                </div>
-                <span className="font-medium text-sm">
-                  {isConnected ? t.connected : isConnecting ? t.connecting : t.disconnected}
-                </span>
-                {menuActive && (
-                  <span className="text-xs bg-purple-500 text-white px-2 py-1 rounded-full">
-                    {t.menuActive}
-                  </span>
-                )}
-              </div>
-
-              {/* Language Selector */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
-                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg border transition-all ${
-                    isDarkMode 
-                      ? 'border-gray-600 bg-gray-700 hover:bg-gray-600 text-white' 
-                      : 'border-gray-300 bg-white hover:bg-gray-50 text-gray-900'
-                  }`}
-                >
-                  <Globe size={16} />
-                  <span className="text-sm">{languageOptions.find(lang => lang.code === currentLanguage)?.flag}</span>
-                  <span className="text-xs">▼</span>
-                </button>
-
-                {showLanguageDropdown && (
-                  <div className={`absolute top-full right-0 mt-2 min-w-48 rounded-lg border shadow-lg z-50 ${
-                    isDarkMode 
-                      ? 'bg-gray-800 border-gray-600' 
-                      : 'bg-white border-gray-200'
-                  }`}>
-                    {languageOptions.map((lang) => (
-                      <button
-                        key={lang.code}
-                        onClick={() => handleLanguageChange(lang.code)}
-                        className={`w-full flex items-center space-x-3 px-4 py-3 text-left hover:transition-all ${
-                          currentLanguage === lang.code
-                            ? isDarkMode 
-                              ? 'bg-blue-600 text-white' 
-                              : 'bg-blue-50 text-blue-700'
-                            : isDarkMode 
-                              ? 'hover:bg-gray-700 text-gray-200' 
-                              : 'hover:bg-gray-50 text-gray-900'
-                        } ${lang === languageOptions[0] ? 'rounded-t-lg' : ''} ${lang === languageOptions[languageOptions.length - 1] ? 'rounded-b-lg' : ''}`}
-                      >
-                        <span className="text-lg">{lang.flag}</span>
-                        <span className="text-sm font-medium">{lang.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Connect Buttons */}
-              <div className="flex gap-2">
-                <button
-                  onClick={toggleConnection}
-                  disabled={isConnecting}
-                  className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                    isConnected
-                      ? 'bg-red-500 hover:bg-red-600 text-white'
-                      : 'bg-blue-600 hover:bg-blue-700 text-white'
-                  } ${isConnecting ? 'opacity-75' : ''}`}
-                >
-                  {isConnecting ? (
-                    <span className="flex items-center">
-                      <span className="animate-spin mr-2">↻</span>
-                      {t.connecting}
-                    </span>
-                  ) : isConnected ? (
-                    t.disconnect
-                  ) : (
-                    t.connect
-                  )}
-                </button>
-
-                <button
-                  onClick={connectAccessories}
-                  disabled={isConnectingAccessories}
-                  className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                    isStickEmConnected
-                      ? 'bg-green-500 hover:bg-green-600 text-white'
-                      : 'bg-purple-600 hover:bg-purple-700 text-white'
-                  } ${isConnectingAccessories ? 'opacity-75' : ''}`}
-                >
-                  {isConnectingAccessories ? (
-                    <span className="flex items-center">
-                      <span className="animate-spin mr-2">↻</span>
-                      Connecting Stick Em...
-                    </span>
-                  ) : isStickEmConnected ? (
-                    'Stick Em Connected'
-                  ) : (
-                    'Connect Stick Em'
-                  )}
-                </button>
-
-                {isStickEmConnected && (
-                  <button
-                    onClick={testStickEmConnection}
-                    className="px-3 py-2 rounded-lg font-medium transition-all bg-yellow-500 hover:bg-yellow-600 text-white text-sm"
-                  >
-                    Test
-                  </button>
-                )}
-              </div>
-
-              {/* Theme Toggle */}
-              <button
-                onClick={toggleTheme}
-                className={`p-2 rounded-lg transition-all ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'}`}
-              >
-                {isDarkMode ? <Sun size={20} className="text-yellow-400" /> : <Moon size={20} className="text-gray-600" />}
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Click outside to close language dropdown */}
-      {showLanguageDropdown && (
-        <div 
-          className="fixed inset-0 z-40" 
-          onClick={() => setShowLanguageDropdown(false)}
-        />
-      )}
+    <div className="min-h-screen bg-purple-900">
 
       {/* Main Interface */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="text-center mb-8">
-          <h1 className={`text-3xl sm:text-4xl font-bold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-            {t.mainTitle}
-          </h1>
-          <p className={`text-lg max-w-2xl mx-auto ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-            {t.subtitle}
-          </p>
-        </div>
-
-        {connectionError && (
-          <div className="mb-6 text-center">
-            <div className="inline-block bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
-              {connectionError}
+      <main className="flex justify-center items-center min-h-screen py-8 px-4">
+        {/* Horizontal Gameboy Console */}
+        <div className="relative w-full max-w-[1400px] rounded-[48px] bg-[#3f2a79] border-[16px] border-[#1f1f1f] shadow-2xl overflow-hidden flex flex-col">
+          {/* Camera URL Input at Top */}
+          <div className="w-full pt-8 pb-4 px-12 flex justify-center">
+            <div className="relative bg-black/40 border-2 border-white/30 rounded-lg p-3 backdrop-blur-sm w-full max-w-[500px]">
+              <input
+                type="text"
+                value={ipCameraUrl}
+                onChange={(e) => setIpCameraUrl(e.target.value)}
+                placeholder="http://ip:port/stream"
+                className="w-full bg-transparent text-white/90 text-sm font-mono placeholder-white/40 border-none outline-none focus:outline-none text-center"
+              />
             </div>
           </div>
-        )}
 
-        {showStickEmMessage && (
-          <div className="mb-6 text-center">
-            <div className={`inline-block px-4 py-2 rounded-lg text-sm ${
-              isDarkMode 
-                ? 'bg-orange-950 border border-orange-700 text-orange-300' 
-                : 'bg-orange-50 border border-orange-200 text-orange-700'
-            }`}>
-              No Stick Em robot connected
-            </div>
-          </div>
-        )}
-
-        {/* Add Card Button */}
-        <div className="flex justify-center mb-6">
-          <button
-            onClick={() => setShowAddCard(true)}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-lg border-2 border-dashed transition-all ${
-              isDarkMode 
-                ? 'border-gray-600 text-gray-300 hover:border-gray-500 hover:text-white' 
-                : 'border-gray-300 text-gray-600 hover:border-gray-400 hover:text-gray-900'
-            }`}
-          >
-            <Plus size={20} />
-            <span>{t.addCard}</span>
-          </button>
-        </div>
-
-
-        {/* Communication Options Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-          {options.map((option, index) => {
-            const isCurrentMenuOption = menuActive && !showYouTubeView && !ytModal.open && currentMenuIndex === index + 1;
-            const isCustomCard = option.id.startsWith('custom-');
-            const isRobotCard = ['forward', 'stop', 'backward', 'forwardLeft', 'forwardRight'].includes(option.id);
-            // Purple for S mode iteration, green for A mode activation
-            const isIterating = isCurrentMenuOption && !activeSelection;
-            const isActivated = activeSelection === option.id;
-            
-            // Determine if card should be disabled
-            const isDisabled = isRobotCard ? !isStickEmConnected : !isConnected;
-            
-            // Debug logging for visual state
-            if (isCurrentMenuOption) {
-              console.log(`🎯 Card ${index + 1} (${option.label}): isCurrentMenuOption=${isCurrentMenuOption}, menuActive=${menuActive}, currentMenuIndex=${currentMenuIndex}, isIterating=${isIterating}`);
-            }
-
-            return (
-              <div
-                key={option.id}
-                className={`
-                  relative group cursor-pointer transition-all duration-300 transform
-                  ${isDarkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-gray-200'}
-                  hover:scale-105 hover:shadow-lg rounded-xl p-6 border-2
-                  ${isIterating ? 'ring-4 ring-purple-400/50' : ''}
-                  ${isActivated ? 'border-green-400 bg-green-50 scale-105' : ''}
-                  ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}
-                `}
-              >
-                {/* Remove button for custom cards */}
-                {isCustomCard && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeCard(option.id);
+          {/* Main Content Container */}
+          <div className="relative z-10 w-full flex items-center justify-between px-12 py-4">
+            {/* Left Side - D-Pad */}
+            <div className="flex flex-col items-center gap-4 w-[220px]">
+              <div className="grid grid-cols-3 gap-3 select-none">
+                <div />
+                <button 
+                  disabled={!isStickEmConnected} 
+                  onClick={async () => {
+                    clearPendingAutoStop();
+                    const sent = await sendStickEmCommand(SERVO_CMD_FORWARD);
+                    if (sent) {
+                      movementStopTimeoutRef.current = setTimeout(() => {
+                        sendStickEmCommand(SERVO_CMD_IDLE);
+                        movementStopTimeoutRef.current = null;
+                      }, forwardDurationSec * 1000);
+                    }
+                  }}
+                  className={`h-16 w-16 rounded-xl bg-black text-white flex items-center justify-center text-3xl font-bold ${!isStickEmConnected ? 'opacity-40' : 'hover:bg-gray-800'}`} 
+                  aria-label="Forward"
+                >
+                  ↑
+                </button>
+                <div />
+                <button 
+                  disabled={!isStickEmConnected} 
+                  onClick={async () => {
+                    clearPendingAutoStop();
+                    const sent = await sendStickEmCommand(SERVO_CMD_FORWARD_LEFT);
+                    if (sent) {
+                      movementStopTimeoutRef.current = setTimeout(() => {
+                        sendStickEmCommand(SERVO_CMD_IDLE);
+                        movementStopTimeoutRef.current = null;
+                      }, leftDurationSec * 1000);
+                    }
+                  }}
+                  className={`h-16 w-16 rounded-xl bg-black text-white flex items-center justify-center text-3xl font-bold ${!isStickEmConnected ? 'opacity-40' : 'hover:bg-gray-800'}`} 
+                  aria-label="Forward Left"
+                >
+                  ↖
+                </button>
+                <button 
+                  disabled={!isStickEmConnected} 
+                  onClick={async () => {
+                    clearPendingAutoStop();
+                    const sent = await sendStickEmCommand(SERVO_CMD_FORWARD);
+                    if (sent) {
+                      movementStopTimeoutRef.current = setTimeout(() => {
+                        sendStickEmCommand(SERVO_CMD_IDLE);
+                        movementStopTimeoutRef.current = null;
+                      }, forwardDurationSec * 1000);
+                    }
+                  }}
+                  className={`h-16 w-16 rounded-xl bg-red-600 text-white flex items-center justify-center text-3xl font-bold ${!isStickEmConnected ? 'opacity-40' : 'hover:bg-red-800'}`} 
+                  aria-label="Attack"
+                >
+                  ⚔
+                </button>
+                <button 
+                  disabled={!isStickEmConnected} 
+                  onClick={async () => {
+                    clearPendingAutoStop();
+                    const sent = await sendStickEmCommand(SERVO_CMD_FORWARD_RIGHT);
+                    if (sent) {
+                      movementStopTimeoutRef.current = setTimeout(() => {
+                        sendStickEmCommand(SERVO_CMD_IDLE);
+                        movementStopTimeoutRef.current = null;
+                      }, rightDurationSec * 1000);
+                    }
+                  }}
+                  className={`h-16 w-16 rounded-xl bg-black text-white flex items-center justify-center text-3xl font-bold ${!isStickEmConnected ? 'opacity-40' : 'hover:bg-gray-800'}`} 
+                  aria-label="Forward Right"
+                >
+                  ↗
+                </button>
+                <div />
+                <button 
+                  disabled={!isStickEmConnected} 
+                  onClick={async () => {
+                    clearPendingAutoStop();
+                    const sent = await sendStickEmCommand(SERVO_CMD_REVERSE);
+                    if (sent) {
+                      movementStopTimeoutRef.current = setTimeout(() => {
+                        sendStickEmCommand(SERVO_CMD_IDLE);
+                        movementStopTimeoutRef.current = null;
+                      }, backwardDurationSec * 1000);
+                    }
+                  }}
+                  className={`h-16 w-16 rounded-xl bg-black text-white flex items-center justify-center text-3xl font-bold ${!isStickEmConnected ? 'opacity-40' : 'hover:bg-gray-800'}`} 
+                  aria-label="Backward"
+                >
+                  ↓
+                </button>
+                <div />
+              </div>
+              
+              {/* Speed Sliders for each direction */}
+              <div className="w-full space-y-3 mt-2">
+                {/* Forward Slider */}
+                <div>
+                  <div className="text-white/80 text-xs mb-1 text-center">↑</div>
+                  <input 
+                    type="range" 
+                    min={1} 
+                    max={3} 
+                    step={1} 
+                    value={forwardDurationSec} 
+                    onChange={(e) => setForwardDurationSec(parseInt(e.target.value))} 
+                    className="w-full h-1.5 rounded-lg appearance-none cursor-pointer"
+                    style={{
+                      background: `linear-gradient(to right, #ef4444 0%, #ef4444 ${((forwardDurationSec - 1) / 2) * 100}%, #4b5563 ${((forwardDurationSec - 1) / 2) * 100}%, #4b5563 100%)`
                     }}
-                    className="absolute -top-2 -left-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
+                  />
+                </div>
 
-                <div onClick={() => handleOptionClick(option)} className="flex flex-col items-center space-y-4">
-                  <div className={`
-                    p-4 rounded-lg transition-all duration-300 group-hover:scale-110
-                    ${isDarkMode ? 'bg-slate-700' : 'bg-gray-50'}
-                    ${isIterating ? 'bg-purple-100' : ''}
-                    ${isActivated ? 'bg-green-100' : ''}
-                  `}>
-                    <div className={`transition-all duration-300 ${
-                      isDarkMode ? 'text-white' : 'text-gray-700'
-                    } ${isIterating ? 'text-purple-600' : ''} ${isActivated ? 'text-green-600' : ''}`}>
-                      {option.icon}
-                    </div>
-                  </div>
+                {/* Left Slider */}
+                <div>
+                  <div className="text-white/80 text-xs mb-1 text-center">↖</div>
+                  <input 
+                    type="range" 
+                    min={1} 
+                    max={3} 
+                    step={1} 
+                    value={leftDurationSec} 
+                    onChange={(e) => setLeftDurationSec(parseInt(e.target.value))} 
+                    className="w-full h-1.5 rounded-lg appearance-none cursor-pointer"
+                    style={{
+                      background: `linear-gradient(to right, #ef4444 0%, #ef4444 ${((leftDurationSec - 1) / 2) * 100}%, #4b5563 ${((leftDurationSec - 1) / 2) * 100}%, #4b5563 100%)`
+                    }}
+                  />
+                </div>
 
-                  <h3 className={`text-lg font-semibold text-center transition-all duration-300 ${
-                    isDarkMode ? 'text-white' : 'text-gray-900'
-                  } ${isIterating ? 'text-purple-600' : ''} ${isActivated ? 'text-green-600' : ''}`}>
-                    {option.label}
-                    {isIterating && <span className="ml-2 text-xs bg-purple-500 text-white px-2 py-1 rounded">HIGHLIGHTED</span>}
-                  </h3>
+                {/* Right Slider */}
+                <div>
+                  <div className="text-white/80 text-xs mb-1 text-center">↗</div>
+                  <input 
+                    type="range" 
+                    min={1} 
+                    max={3} 
+                    step={1} 
+                    value={rightDurationSec} 
+                    onChange={(e) => setRightDurationSec(parseInt(e.target.value))} 
+                    className="w-full h-1.5 rounded-lg appearance-none cursor-pointer"
+                    style={{
+                      background: `linear-gradient(to right, #ef4444 0%, #ef4444 ${((rightDurationSec - 1) / 2) * 100}%, #4b5563 ${((rightDurationSec - 1) / 2) * 100}%, #4b5563 100%)`
+                    }}
+                  />
+                </div>
 
-                  {(isIterating || isActivated) && (
-                    <div className="absolute -top-2 -right-2 w-6 h-6 bg-green-400 rounded-full flex items-center justify-center animate-pulse">
-                      <div className="w-3 h-3 bg-white rounded-full"></div>
-                    </div>
-                  )}
+                {/* Backward Slider */}
+                <div>
+                  <div className="text-white/80 text-xs mb-1 text-center">↓</div>
+                  <input 
+                    type="range" 
+                    min={1} 
+                    max={3} 
+                    step={1} 
+                    value={backwardDurationSec} 
+                    onChange={(e) => setBackwardDurationSec(parseInt(e.target.value))} 
+                    className="w-full h-1.5 rounded-lg appearance-none cursor-pointer"
+                    style={{
+                      background: `linear-gradient(to right, #ef4444 0%, #ef4444 ${((backwardDurationSec - 1) / 2) * 100}%, #4b5563 ${((backwardDurationSec - 1) / 2) * 100}%, #4b5563 100%)`
+                    }}
+                  />
+                </div>
+
+                {/* Attack Slider */}
+                <div>
+                  <div className="text-white/80 text-xs mb-1 text-center">⚔</div>
+                  <input 
+                    type="range" 
+                    min={1} 
+                    max={3} 
+                    step={1} 
+                    value={forwardDurationSec} 
+                    onChange={(e) => setForwardDurationSec(parseInt(e.target.value))} 
+                    className="w-full h-1.5 rounded-lg appearance-none cursor-pointer"
+                    style={{
+                      background: `linear-gradient(to right, #ef4444 0%, #ef4444 ${((forwardDurationSec - 1) / 2) * 100}%, #4b5563 ${((forwardDurationSec - 1) / 2) * 100}%, #4b5563 100%)`
+                    }}
+                  />
+                </div>
+
+                <div className="flex justify-between text-white/50 text-xs mt-2">
+                  <span>1s</span>
+                  <span>3s</span>
                 </div>
               </div>
-            );
-          })}
+            </div>
+
+            {/* Center - Screen/Iframe */}
+            <div className="flex-1 mx-8">
+              <div className="bg-black/30 rounded-3xl p-4 h-[480px] flex items-center justify-center relative">
+                {ipCameraUrl ? (
+                  <div className="w-full h-full rounded-2xl overflow-hidden">
+                    <iframe
+                      src={ipCameraUrl}
+                      title="IP Camera"
+                      className="w-full h-full border-0"
+                      scrolling="no"
+                      allow="autoplay; clipboard-write; encrypted-media; picture-in-picture"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center space-y-4 text-center w-full h-full">
+                    {gameOver ? (
+                      /* Game Over Screen */
+                      <div className="space-y-4">
+                        <div className="text-red-500 text-3xl font-bold font-mono animate-pulse">GAME OVER</div>
+                        <div className="text-white text-lg font-mono">FINAL SCORE: {score}</div>
+                        <button
+                          onClick={resetGame}
+                          className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors"
+                        >
+                          PLAY AGAIN
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Retro Game Display */}
+                        <div className="w-full max-w-md aspect-video bg-black border-4 border-gray-700 rounded-lg relative overflow-hidden">
+                          {/* Stars background */}
+                          <div className="absolute inset-0">
+                            {starPositions.map((star, i) => (
+                              <div
+                                key={i}
+                                className="absolute w-1 h-1 bg-white rounded-full animate-pulse"
+                                style={{
+                                  left: `${star.x}%`,
+                                  top: `${star.y}%`,
+                                  animationDelay: `${star.delay}s`,
+                                  animationDuration: `${star.duration}s`
+                                }}
+                              />
+                            ))}
+                          </div>
+
+                          {/* Space ship */}
+                          <div 
+                            className="absolute text-green-400 text-4xl transition-all duration-50"
+                            style={{ 
+                              left: `${shipPosition.x}%`, 
+                              bottom: `${100 - shipPosition.y}%`,
+                              transform: 'translateX(-50%)'
+                            }}
+                          >
+                            ▲
+                          </div>
+
+                          {/* Alien ships */}
+                          {alienShips.map(alien => (
+                            <div
+                              key={alien.id}
+                              className="absolute text-red-500 text-3xl transition-all duration-50"
+                              style={{
+                                left: `${alien.x}%`,
+                                top: `${alien.y}%`,
+                                transform: 'translate(-50%, -50%)'
+                              }}
+                            >
+                              ▼
+                            </div>
+                          ))}
+
+                          {/* Bullets */}
+                          {bullets.map(bullet => (
+                            <div
+                              key={bullet.id}
+                              className="absolute text-yellow-300 text-xl transition-all duration-50"
+                              style={{
+                                left: `${bullet.x}%`,
+                                bottom: `${100 - bullet.y}%`,
+                                transform: 'translateX(-50%)'
+                              }}
+                            >
+                              |
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Instructions */}
+                        <div className="space-y-1">
+                          <div className="text-white/80 text-xs font-mono">INSERT CAMERA URL ABOVE</div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right Side - Connect Buttons */}
+            <div className="flex flex-col items-center gap-4 w-[220px]">
+              <div className="mb-2">
+                <div className="text-white/90 text-sm font-medium text-center whitespace-nowrap">
+                  Connect<br/>Neural Drive
+                </div>
+              </div>
+
+              <button 
+                onClick={toggleConnection} 
+                disabled={isConnecting}
+                className={`h-20 w-20 rounded-full bg-red-500 shadow-inner border-4 border-red-300 hover:bg-red-600 transition-colors flex items-center justify-center ${isConnecting ? 'animate-pulse' : ''}`} 
+                aria-label="Connect Neural Drive" 
+              />
+              
+              <button 
+                onClick={connectAccessories} 
+                disabled={isConnectingAccessories}
+                className={`h-20 w-20 rounded-full bg-blue-500 shadow-inner border-4 border-blue-300 hover:bg-blue-600 transition-colors flex items-center justify-center ${isConnectingAccessories ? 'animate-pulse' : ''}`} 
+                aria-label="Connect Stick Em" 
+              />
+
+              <div className="mt-2">
+                <div className="text-white/90 text-sm font-medium text-center whitespace-nowrap">
+                  Connect<br/>Stick 'Em
+                </div>
+              </div>
+
+              {/* Status Indicators */}
+              <div className="flex flex-col gap-2 mt-4">
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`}></div>
+                  <span className="text-white/80 text-xs">Neural</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${isStickEmConnected ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`}></div>
+                  <span className="text-white/80 text-xs">Stick 'Em</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Title at Bottom */}
+          <div className="w-full pb-6 pt-4 flex justify-center">
+            <h2 className="text-white text-xl font-bold text-center">NeuralDrive x Stick 'Em™</h2>
+          </div>
         </div>
       </main>
 
