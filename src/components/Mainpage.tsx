@@ -338,9 +338,8 @@ interface BluetoothRemoteGATTCharacteristic extends EventTarget {
 }
 
 const CommunicationInterface: React.FC = () => {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState<Language>('en');
-  const [, setShowLanguageDropdown] = useState(false);
 
   // Initialize language from localStorage
   useEffect(() => {
@@ -357,7 +356,7 @@ const CommunicationInterface: React.FC = () => {
     document.documentElement.lang = currentLanguage;
   }, [currentLanguage]);
   const [isConnected, setIsConnected] = useState(false);
-  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [, setSelectedOption] = useState<string | null>(null);
   const [activeSelection, setActiveSelection] = useState<string | null>(null);
   const [currentMenuIndex, setCurrentMenuIndex] = useState(0);
   const [menuActive, setMenuActive] = useState(false);
