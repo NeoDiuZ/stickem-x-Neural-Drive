@@ -652,18 +652,31 @@ const CommunicationInterface: React.FC = () => {
       if (data[0] === 'S'.charCodeAt(0)) {
         const newIndex = data[1];
         console.log(`🏠 MAIN MENU: 'S' received, index=${newIndex}, options.length=${options.length}`);
+        
+        // D-pad buttons (1-5) are always selectable via neural activation
+        // Button mapping: 1=↑, 2=↖, 3=⚔, 4=↗, 5=↓
+        if (newIndex >= 1 && newIndex <= 5) {
+          const buttonNames = ['', '↑ Forward', '↖ Forward Left', '⚔ Stop', '↗ Forward Right', '↓ Backward'];
+          console.log(`🎮 D-PAD: Selecting button ${newIndex} (${buttonNames[newIndex]}) via neural activation`);
+          setMenuActive(true);
+          setCurrentMenuIndex(newIndex);
+          // Clear any previous active selection
+          setActiveSelection(null);
+          setActiveDpadButton(null);
+          // Update selected button - this shows green outline
+          setSelectedDpadButton(newIndex);
+          playSound('select.mp3');
+          console.log(`✅ D-PAD: Button ${newIndex} (${buttonNames[newIndex]}) now selected with green outline`);
+          return;
+        }
+        
+        // Handle menu options (if any exist beyond d-pad buttons)
         if (newIndex > 0 && newIndex <= options.length) {
           console.log(`🏠 MAIN MENU: Valid index, highlighting card: ${options[newIndex - 1]?.label || 'unknown'}`);
           setMenuActive(true);
           setCurrentMenuIndex(newIndex);
           setActiveSelection(null);
-          // If selecting one of the first 5 options, also highlight the corresponding d-pad button (1-5)
-          if (newIndex >= 1 && newIndex <= 5) {
-            setSelectedDpadButton(newIndex);
-          } else {
-            setSelectedDpadButton(null);
-          }
-          // Play select sound when highlighting a new card
+          setSelectedDpadButton(null); // Clear d-pad selection for menu options
           playSound('select.mp3');
           console.log(`🏠 MAIN MENU: State updated - menuActive=true, currentMenuIndex=${newIndex}`);
         } else {
@@ -674,6 +687,29 @@ const CommunicationInterface: React.FC = () => {
       if (data[0] === 'A'.charCodeAt(0)) {
         const selectedIndex = data[1];
         console.log(`🏠 MAIN MENU: 'A' received, index=${selectedIndex}, options.length=${options.length}`);
+        
+        // D-pad buttons (1-5) are always activatable via neural activation
+        // Button mapping: 1=↑, 2=↖, 3=⚔, 4=↗, 5=↓
+        if (selectedIndex >= 1 && selectedIndex <= 5) {
+          const buttonNames = ['', '↑ Forward', '↖ Forward Left', '⚔ Stop', '↗ Forward Right', '↓ Backward'];
+          console.log(`🎮 D-PAD: Activating button ${selectedIndex} (${buttonNames[selectedIndex]}) via neural activation`);
+          // Create a dummy option ID for d-pad activation
+          const dpadOptionId = `dpad-${selectedIndex}`;
+          setSelectedOption(dpadOptionId);
+          setActiveSelection(dpadOptionId);
+          // Keep the selected button highlighted after activation (green outline)
+          setSelectedDpadButton(selectedIndex);
+          playSound('select.mp3');
+          setPendingActionOptionId(dpadOptionId);
+          console.log(`✅ D-PAD: Button ${selectedIndex} (${buttonNames[selectedIndex]}) activation queued - will show green fill`);
+          // Clear active selection after a short delay, but keep button selected
+          setTimeout(() => {
+            setActiveSelection(null);
+          }, 1000);
+          return;
+        }
+        
+        // Handle menu options (if any exist beyond d-pad buttons)
         if (selectedIndex > 0 && selectedIndex <= options.length) {
           const optionId = options[selectedIndex - 1].id;
           console.log(`🏠 MAIN MENU: Activating option: ${optionId} (${options[selectedIndex - 1]?.label})`);
@@ -978,7 +1014,49 @@ const CommunicationInterface: React.FC = () => {
       return;
     }
     
-    // Handle neural activations for D-pad movements
+      // Check if this is a direct d-pad activation (format: "dpad-1" to "dpad-5")
+      const dpadMatch = pendingActionOptionId.match(/^dpad-(\d+)$/);
+      if (dpadMatch && isStickEmConnected) {
+        const dpadButtonIndex = parseInt(dpadMatch[1], 10); // 1-5
+        
+        // Set active state with visual feedback (green fill)
+        setActiveDpadButton(dpadButtonIndex);
+        // Keep the button selected (green outline) after activation
+        setSelectedDpadButton(dpadButtonIndex);
+        setTimeout(() => {
+          setActiveDpadButton(null);
+          // Keep selection highlighted for next cycle
+        }, 1000); // Clear fill after 1 second, but keep outline
+        
+        // Map d-pad button indices to movements: 1=↑, 2=↖, 3=⚔, 4=↗, 5=↓
+        switch (dpadButtonIndex) {
+        case 1: // Forward (↑)
+          console.log('🎮 D-PAD: Neural activation - Forward (↑)');
+          sendMovementWithAutoStop(SERVO_CMD_FORWARD);
+          break;
+        case 2: // Forward Left (↖)
+          console.log('🎮 D-PAD: Neural activation - Forward Left (↖)');
+          sendMovementWithAutoStop(SERVO_CMD_FORWARD_LEFT);
+          break;
+        case 3: // Stop (⚔)
+          console.log('🎮 D-PAD: Neural activation - Stop (⚔)');
+          clearPendingAutoStop();
+          sendStickEmCommand(SERVO_CMD_IDLE);
+          break;
+        case 4: // Forward Right (↗)
+          console.log('🎮 D-PAD: Neural activation - Forward Right (↗)');
+          sendMovementWithAutoStop(SERVO_CMD_FORWARD_RIGHT);
+          break;
+        case 5: // Backward (↓)
+          console.log('🎮 D-PAD: Neural activation - Backward (↓)');
+          sendMovementWithAutoStop(SERVO_CMD_REVERSE);
+          break;
+      }
+      setPendingActionOptionId(null);
+      return;
+    }
+    
+    // Handle neural activations for menu options (if any exist)
     // Map neural activations to D-pad movements based on option index
     const optionIndex = options.findIndex(opt => opt.id === pendingActionOptionId);
     if (optionIndex >= 0 && isStickEmConnected) {
