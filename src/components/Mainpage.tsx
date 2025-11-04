@@ -404,32 +404,6 @@ const CommunicationInterface: React.FC = () => {
   const [selectedDpadButton, setSelectedDpadButton] = useState<number | null>(null); // 1-5: ↑, ↖, ⚔, ↗, ↓
   const [activeDpadButton, setActiveDpadButton] = useState<number | null>(null); // 1-5 when activated
 
-  // Static game state for display (non-playable)
-  const [gameOver] = useState(false);
-  const [score] = useState(1250);
-  const [shipPosition] = useState({ x: 50, y: 80 });
-  const [alienShips] = useState<Array<{ id: number; x: number; y: number }>>([
-    { id: 1, x: 30, y: 20 },
-    { id: 2, x: 70, y: 15 }
-  ]);
-  const [bullets] = useState<Array<{ id: number; x: number; y: number }>>([
-    { id: 1, x: 50, y: 60 },
-    { id: 2, x: 48, y: 45 }
-  ]);
-  const [starPositions] = useState(() => {
-    return Array.from({ length: 30 }, (_, i) => ({
-      x: (i * 7) % 100,
-      y: (i * 11) % 100,
-      delay: 0,
-      duration: 1
-    }));
-  });
-
-  // Dummy reset function (does nothing since game is static)
-  const resetGame = useCallback(() => {
-    // Game is static, no reset needed
-  }, []);
-
   // Stick 'Em Robot will use the existing lights connection system
 
   // Get current translations
@@ -1207,8 +1181,8 @@ const CommunicationInterface: React.FC = () => {
                         : 'bg-black border-4 border-gray-600'
                   }`}
                   style={{
-                    left: 'calc(50% - 82px - 48px)',
-                    top: 'calc(50% + 109px - 48px)'
+                    left: 'calc(50% - 128px - 48px)',
+                    top: 'calc(50% - 42px - 48px)'
                   }}
                   aria-label="Forward Left"
                 >
@@ -1238,8 +1212,8 @@ const CommunicationInterface: React.FC = () => {
                         : 'bg-black border-4 border-gray-600'
                   }`}
                   style={{
-                    left: 'calc(50% - 128px - 48px)',
-                    top: 'calc(50% - 42px - 48px)'
+                    left: 'calc(50% - 82px - 48px)',
+                    top: 'calc(50% + 109px - 48px)'
                   }}
                   aria-label="Backward"
                 >
