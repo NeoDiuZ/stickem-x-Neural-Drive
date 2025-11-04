@@ -389,6 +389,7 @@ const CommunicationInterface: React.FC = () => {
   const SERVO_CMD_REVERSE = 'mv:1000:2000:1000:2000:-:-:-:-:-,';
   const SERVO_CMD_FORWARD_LEFT = 'mv:1500:1000:1500:1000:-:-:-:-:-,';
   const SERVO_CMD_FORWARD_RIGHT = 'mv:2000:1500:2000:1500:-:-:-:-:-,';
+  const SERVO_CMD_ATTACK = 'mv:-:-:-:-:2000:1000:-:-:-,';
   const connectedStickEmDeviceRef = useRef<BluetoothDevice | null>(null);
   const stickEmCharacteristicRef = useRef<BluetoothRemoteGATTCharacteristic | null>(null);
   const [isStickEmConnected, setIsStickEmConnected] = useState(false);
@@ -399,6 +400,7 @@ const CommunicationInterface: React.FC = () => {
   const [leftDurationSec, setLeftDurationSec] = useState<number>(1);
   const [rightDurationSec, setRightDurationSec] = useState<number>(1);
   const [backwardDurationSec, setBackwardDurationSec] = useState<number>(1);
+  const [attackDurationSec, setAttackDurationSec] = useState<number>(1);
   const movementStopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // D-pad button selection state for neural activation
   const [selectedDpadButton, setSelectedDpadButton] = useState<number | null>(null); // 1-5: ↑, ↖, ⚔, ↗, ↓
@@ -653,10 +655,10 @@ const CommunicationInterface: React.FC = () => {
         const newIndex = data[1];
         console.log(`🏠 MAIN MENU: 'S' received, index=${newIndex}, options.length=${options.length}`);
         
-        // D-pad buttons (1-5) are always selectable via neural activation
-        // Button mapping: 1=↑, 2=↖, 3=⚔, 4=↗, 5=↓
+                // D-pad buttons (1-5) are always selectable via neural activation      
+        // Button mapping: 1=Forward, 2=Right, 3=Attack, 4=Backward, 5=Left
         if (newIndex >= 1 && newIndex <= 5) {
-          const buttonNames = ['', '↑ Forward', '↖ Forward Left', '⚔ Stop', '↗ Forward Right', '↓ Backward'];
+          const buttonNames = ['', 'Forward', 'Right', 'Attack', 'Backward', 'Left'];
           console.log(`🎮 D-PAD: Selecting button ${newIndex} (${buttonNames[newIndex]}) via neural activation`);
           setMenuActive(true);
           setCurrentMenuIndex(newIndex);
@@ -688,10 +690,10 @@ const CommunicationInterface: React.FC = () => {
         const selectedIndex = data[1];
         console.log(`🏠 MAIN MENU: 'A' received, index=${selectedIndex}, options.length=${options.length}`);
         
-        // D-pad buttons (1-5) are always activatable via neural activation
-        // Button mapping: 1=↑, 2=↖, 3=⚔, 4=↗, 5=↓
+                // D-pad buttons (1-5) are always activatable via neural activation     
+        // Button mapping: 1=Forward, 2=Right, 3=Attack, 4=Backward, 5=Left
         if (selectedIndex >= 1 && selectedIndex <= 5) {
-          const buttonNames = ['', '↑ Forward', '↖ Forward Left', '⚔ Stop', '↗ Forward Right', '↓ Backward'];
+          const buttonNames = ['', 'Forward', 'Right', 'Attack', 'Backward', 'Left'];
           console.log(`🎮 D-PAD: Activating button ${selectedIndex} (${buttonNames[selectedIndex]}) via neural activation`);
           // Create a dummy option ID for d-pad activation
           const dpadOptionId = `dpad-${selectedIndex}`;
@@ -893,15 +895,15 @@ const CommunicationInterface: React.FC = () => {
     }
   }, []);
 
-  const sendMovementWithAutoStop = useCallback(async (command: string) => {
+  const sendMovementWithAutoStop = useCallback(async (command: string, durationSec: number = 1) => {
     clearPendingAutoStop();
     const sent = await sendStickEmCommand(command);
     if (!sent) return;
     movementStopTimeoutRef.current = setTimeout(() => {
       sendStickEmCommand(SERVO_CMD_IDLE);
       movementStopTimeoutRef.current = null;
-    }, Math.max(1, Math.min(3, moveDurationSec)) * 1000);
-  }, [clearPendingAutoStop, moveDurationSec, sendStickEmCommand]);
+    }, Math.max(1, Math.min(3, durationSec)) * 1000);
+  }, [clearPendingAutoStop, sendStickEmCommand]);
 
   // Test BLE connection with a simple command (unused, kept for future use)
   // const testStickEmConnection = useCallback(async () => {
@@ -1028,28 +1030,27 @@ const CommunicationInterface: React.FC = () => {
           // Keep selection highlighted for next cycle
         }, 1000); // Clear fill after 1 second, but keep outline
         
-        // Map d-pad button indices to movements: 1=↑, 2=↖, 3=⚔, 4=↗, 5=↓
+                // Map d-pad button indices to movements: 1=Forward, 2=Right, 3=Attack, 4=Backward, 5=Left       
         switch (dpadButtonIndex) {
-        case 1: // Forward (↑)
-          console.log('🎮 D-PAD: Neural activation - Forward (↑)');
-          sendMovementWithAutoStop(SERVO_CMD_FORWARD);
+        case 1: // Forward
+          console.log('🎮 D-PAD: Neural activation - Forward');
+          sendMovementWithAutoStop(SERVO_CMD_FORWARD, forwardDurationSec);
           break;
-        case 2: // Forward Left (↖)
-          console.log('🎮 D-PAD: Neural activation - Forward Left (↖)');
-          sendMovementWithAutoStop(SERVO_CMD_FORWARD_LEFT);
+        case 2: // Right
+          console.log('🎮 D-PAD: Neural activation - Right');       
+          sendMovementWithAutoStop(SERVO_CMD_FORWARD_RIGHT, rightDurationSec);
           break;
-        case 3: // Stop (⚔)
-          console.log('🎮 D-PAD: Neural activation - Stop (⚔)');
-          clearPendingAutoStop();
-          sendStickEmCommand(SERVO_CMD_IDLE);
+        case 3: // Attack/Stop
+          console.log('🎮 D-PAD: Neural activation - Attack/Stop');
+          sendMovementWithAutoStop(SERVO_CMD_ATTACK, attackDurationSec);
           break;
-        case 4: // Forward Right (↗)
-          console.log('🎮 D-PAD: Neural activation - Forward Right (↗)');
-          sendMovementWithAutoStop(SERVO_CMD_FORWARD_RIGHT);
+        case 4: // Backward
+          console.log('🎮 D-PAD: Neural activation - Backward');
+          sendMovementWithAutoStop(SERVO_CMD_REVERSE, backwardDurationSec);
           break;
-        case 5: // Backward (↓)
-          console.log('🎮 D-PAD: Neural activation - Backward (↓)');
-          sendMovementWithAutoStop(SERVO_CMD_REVERSE);
+        case 5: // Left
+          console.log('🎮 D-PAD: Neural activation - Left');        
+          sendMovementWithAutoStop(SERVO_CMD_FORWARD_LEFT, leftDurationSec);
           break;
       }
       setPendingActionOptionId(null);
@@ -1060,43 +1061,42 @@ const CommunicationInterface: React.FC = () => {
     // Map neural activations to D-pad movements based on option index
     const optionIndex = options.findIndex(opt => opt.id === pendingActionOptionId);
     if (optionIndex >= 0 && isStickEmConnected) {
-      // Map first 5 neural activations to D-pad buttons: 1=↑, 2=↖, 3=⚔, 4=↗, 5=↓
+            // Map first 5 neural activations to D-pad buttons: 1=Forward, 2=Right, 3=Attack, 4=Backward, 5=Left                                                                               
       const dpadButtonIndex = optionIndex + 1; // Convert 0-4 to 1-5
-      
+
       // Set active state with visual feedback
       setActiveDpadButton(dpadButtonIndex);
       setTimeout(() => {
         setActiveDpadButton(null);
       }, 1000); // Clear after 1 second
-      
+
       // Map first 5 neural activations to D-pad movements
       switch (optionIndex) {
-        case 0: // First option -> Forward (↑)
+        case 0: // First option -> Forward
           console.log('Neural activation: Sending Forward command');
-          sendMovementWithAutoStop(SERVO_CMD_FORWARD);
+          sendMovementWithAutoStop(SERVO_CMD_FORWARD, forwardDurationSec);
           break;
-        case 1: // Second option -> Forward Left (↖)
-          console.log('Neural activation: Sending Forward Left command');
-          sendMovementWithAutoStop(SERVO_CMD_FORWARD_LEFT);
+        case 1: // Second option -> Right
+          console.log('Neural activation: Sending Right command');       
+          sendMovementWithAutoStop(SERVO_CMD_FORWARD_RIGHT, rightDurationSec);
           break;
-        case 2: // Third option -> Stop (⚔)
-          console.log('Neural activation: Sending Stop command');
-          clearPendingAutoStop();
-          sendStickEmCommand(SERVO_CMD_IDLE);
+        case 2: // Third option -> Attack/Stop
+          console.log('Neural activation: Sending Attack command');
+          sendMovementWithAutoStop(SERVO_CMD_ATTACK, attackDurationSec);
           break;
-        case 3: // Fourth option -> Forward Right (↗)
-          console.log('Neural activation: Sending Forward Right command');
-          sendMovementWithAutoStop(SERVO_CMD_FORWARD_RIGHT);
+        case 3: // Fourth option -> Backward
+          console.log('Neural activation: Sending Backward command');      
+          sendMovementWithAutoStop(SERVO_CMD_REVERSE, backwardDurationSec);
           break;
-        case 4: // Fifth option -> Backward (↓)
-          console.log('Neural activation: Sending Backward command');
-          sendMovementWithAutoStop(SERVO_CMD_REVERSE);
+        case 4: // Fifth option -> Left
+          console.log('Neural activation: Sending Left command');
+          sendMovementWithAutoStop(SERVO_CMD_FORWARD_LEFT, leftDurationSec);
           break;
       }
     }
     
     setPendingActionOptionId(null);
-  }, [pendingActionOptionId, ytModal.open, showYouTubeView, sendStickEmCommand, options, isStickEmConnected, sendMovementWithAutoStop, clearPendingAutoStop]);
+  }, [pendingActionOptionId, ytModal.open, showYouTubeView, sendStickEmCommand, options, isStickEmConnected, sendMovementWithAutoStop, clearPendingAutoStop, forwardDurationSec, rightDurationSec, backwardDurationSec, leftDurationSec, attackDurationSec]);
 
   // Toggle theme (unused, kept for future use)
   // const toggleTheme = () => {
@@ -1180,51 +1180,57 @@ const CommunicationInterface: React.FC = () => {
                   ↑
                 </button>
 
-                {/* Button 2: Forward Right (↗) - 18° from right (72° clockwise from top) */}
-                <button 
-                  disabled={!isStickEmConnected} 
+                                {/* Button 2: Right (↗) - 18° from right (72° clockwise from top) */}                                                                   
+                <button
+                  disabled={!isStickEmConnected}
                   onClick={async () => {
                     clearPendingAutoStop();
-                    const sent = await sendStickEmCommand(SERVO_CMD_FORWARD_RIGHT);
+                    const sent = await sendStickEmCommand(SERVO_CMD_FORWARD_RIGHT);                                                                             
                     if (sent) {
-                      movementStopTimeoutRef.current = setTimeout(() => {
+                      movementStopTimeoutRef.current = setTimeout(() => {       
                         sendStickEmCommand(SERVO_CMD_IDLE);
                         movementStopTimeoutRef.current = null;
                       }, rightDurationSec * 1000);
                     }
                   }}
-                  className={`absolute h-24 w-24 rounded-full text-white flex items-center justify-center text-5xl font-bold transition-all duration-200 ${
-                    !isStickEmConnected ? 'opacity-40' : 'hover:bg-gray-700'
+                  className={`absolute h-24 w-24 rounded-full text-white flex items-center justify-center text-5xl font-bold transition-all duration-200 ${     
+                    !isStickEmConnected ? 'opacity-40' : 'hover:bg-gray-700'    
                   } ${
-                    selectedDpadButton === 4 && activeDpadButton !== 4 
-                      ? 'border-4 border-green-500 bg-black' 
-                      : activeDpadButton === 4 
-                        ? 'bg-green-500 border-4 border-green-400' 
+                    selectedDpadButton === 2 && activeDpadButton !== 2
+                      ? 'border-4 border-green-500 bg-black'
+                      : activeDpadButton === 2
+                        ? 'bg-green-500 border-4 border-green-400'
                         : 'bg-black border-4 border-gray-600'
                   }`}
                   style={{
                     left: 'calc(50% + 128px - 48px)',
                     top: 'calc(50% - 42px - 48px)'
                   }}
-                  aria-label="Forward Right"
+                  aria-label="Right"
                 >
                   ↗
                 </button>
 
-                {/* Button 3: Attack/Stop (⚔) - 306° from right (144° clockwise from top) */}
-                <button 
-                  disabled={!isStickEmConnected} 
+                                {/* Button 3: Attack/Stop (⚔) - 306° from right (144° clockwise from top) */}                                                                   
+                <button
+                  disabled={!isStickEmConnected}
                   onClick={async () => {
                     clearPendingAutoStop();
-                    await sendStickEmCommand(SERVO_CMD_IDLE);
+                    const sent = await sendStickEmCommand(SERVO_CMD_ATTACK);
+                    if (sent) {
+                      movementStopTimeoutRef.current = setTimeout(() => {       
+                        sendStickEmCommand(SERVO_CMD_IDLE);
+                        movementStopTimeoutRef.current = null;
+                      }, attackDurationSec * 1000);
+                    }
                   }}
-                  className={`absolute h-24 w-24 rounded-full text-white flex items-center justify-center text-5xl font-bold transition-all duration-200 ${
-                    !isStickEmConnected ? 'opacity-40' : 'hover:bg-red-700'
+                  className={`absolute h-24 w-24 rounded-full text-white flex items-center justify-center text-5xl font-bold transition-all duration-200 ${     
+                    !isStickEmConnected ? 'opacity-40' : 'hover:bg-red-700'     
                   } ${
-                    selectedDpadButton === 3 && activeDpadButton !== 3 
+                    selectedDpadButton === 3 && activeDpadButton !== 3
                       ? 'border-4 border-green-500 bg-red-600' 
-                      : activeDpadButton === 3 
-                        ? 'bg-green-500 border-4 border-green-400' 
+                      : activeDpadButton === 3
+                        ? 'bg-green-500 border-4 border-green-400'
                         : 'bg-red-600 border-4 border-red-500'
                   }`}
                   style={{
@@ -1236,57 +1242,57 @@ const CommunicationInterface: React.FC = () => {
                   ⚔
                 </button>
 
-                {/* Button 4: Forward Left (↖) - 234° from right (216° clockwise from top) */}
-                <button 
-                  disabled={!isStickEmConnected} 
+                                {/* Button 4: Left (↖) - 234° from right (216° clockwise from top) */}                                                                  
+                <button
+                  disabled={!isStickEmConnected}
                   onClick={async () => {
                     clearPendingAutoStop();
-                    const sent = await sendStickEmCommand(SERVO_CMD_FORWARD_LEFT);
+                    const sent = await sendStickEmCommand(SERVO_CMD_FORWARD_LEFT);                                                                              
                     if (sent) {
-                      movementStopTimeoutRef.current = setTimeout(() => {
+                      movementStopTimeoutRef.current = setTimeout(() => {       
                         sendStickEmCommand(SERVO_CMD_IDLE);
                         movementStopTimeoutRef.current = null;
                       }, leftDurationSec * 1000);
                     }
                   }}
-                  className={`absolute h-24 w-24 rounded-full text-white flex items-center justify-center text-5xl font-bold transition-all duration-200 ${
-                    !isStickEmConnected ? 'opacity-40' : 'hover:bg-gray-700'
+                  className={`absolute h-24 w-24 rounded-full text-white flex items-center justify-center text-5xl font-bold transition-all duration-200 ${     
+                    !isStickEmConnected ? 'opacity-40' : 'hover:bg-gray-700'    
                   } ${
-                    selectedDpadButton === 2 && activeDpadButton !== 2 
-                      ? 'border-4 border-green-500 bg-black' 
-                      : activeDpadButton === 2 
-                        ? 'bg-green-500 border-4 border-green-400' 
+                    selectedDpadButton === 5 && activeDpadButton !== 5
+                      ? 'border-4 border-green-500 bg-black'
+                      : activeDpadButton === 5
+                        ? 'bg-green-500 border-4 border-green-400'
                         : 'bg-black border-4 border-gray-600'
                   }`}
                   style={{
                     left: 'calc(50% - 128px - 48px)',
                     top: 'calc(50% - 42px - 48px)'
                   }}
-                  aria-label="Forward Left"
+                  aria-label="Left"
                 >
                   ↖
                 </button>
 
-                {/* Button 5: Backward (↓) - 162° from right (4th position, 72° * 4 = 288° clockwise from top) */}
-                <button 
-                  disabled={!isStickEmConnected} 
+                                {/* Button 5: Backward (↓) - 162° from right (4th position, 72° * 4 = 288° clockwise from top) */}                                              
+                <button
+                  disabled={!isStickEmConnected}
                   onClick={async () => {
                     clearPendingAutoStop();
-                    const sent = await sendStickEmCommand(SERVO_CMD_REVERSE);
+                    const sent = await sendStickEmCommand(SERVO_CMD_REVERSE);   
                     if (sent) {
-                      movementStopTimeoutRef.current = setTimeout(() => {
+                      movementStopTimeoutRef.current = setTimeout(() => {       
                         sendStickEmCommand(SERVO_CMD_IDLE);
                         movementStopTimeoutRef.current = null;
                       }, backwardDurationSec * 1000);
                     }
                   }}
-                  className={`absolute h-24 w-24 rounded-full text-white flex items-center justify-center text-5xl font-bold transition-all duration-200 ${
-                    !isStickEmConnected ? 'opacity-40' : 'hover:bg-gray-700'
+                  className={`absolute h-24 w-24 rounded-full text-white flex items-center justify-center text-5xl font-bold transition-all duration-200 ${     
+                    !isStickEmConnected ? 'opacity-40' : 'hover:bg-gray-700'    
                   } ${
-                    selectedDpadButton === 5 && activeDpadButton !== 5 
-                      ? 'border-4 border-green-500 bg-black' 
-                      : activeDpadButton === 5 
-                        ? 'bg-green-500 border-4 border-green-400' 
+                    selectedDpadButton === 4 && activeDpadButton !== 4
+                      ? 'border-4 border-green-500 bg-black'
+                      : activeDpadButton === 4
+                        ? 'bg-green-500 border-4 border-green-400'
                         : 'bg-black border-4 border-gray-600'
                   }`}
                   style={{
@@ -1379,11 +1385,11 @@ const CommunicationInterface: React.FC = () => {
                     min={1} 
                     max={3} 
                     step={1} 
-                    value={forwardDurationSec} 
-                    onChange={(e) => setForwardDurationSec(parseInt(e.target.value))} 
+                    value={attackDurationSec} 
+                    onChange={(e) => setAttackDurationSec(parseInt(e.target.value))} 
                     className="w-full h-3 rounded-lg appearance-none cursor-pointer"
                     style={{
-                      background: `linear-gradient(to right, #ef4444 0%, #ef4444 ${((forwardDurationSec - 1) / 2) * 100}%, #4b5563 ${((forwardDurationSec - 1) / 2) * 100}%, #4b5563 100%)`
+                      background: `linear-gradient(to right, #ef4444 0%, #ef4444 ${((attackDurationSec - 1) / 2) * 100}%, #4b5563 ${((attackDurationSec - 1) / 2) * 100}%, #4b5563 100%)`
                     }}
                   />
                 </div>
