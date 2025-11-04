@@ -400,7 +400,9 @@ const CommunicationInterface: React.FC = () => {
   const [rightDurationSec, setRightDurationSec] = useState<number>(1);
   const [backwardDurationSec, setBackwardDurationSec] = useState<number>(1);
   const movementStopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [ipCameraUrl, setIpCameraUrl] = useState<string>('');
+  // D-pad button selection state for neural activation
+  const [selectedDpadButton, setSelectedDpadButton] = useState<number | null>(null); // 1-5: ↑, ↖, ⚔, ↗, ↓
+  const [activeDpadButton, setActiveDpadButton] = useState<number | null>(null); // 1-5 when activated
 
   // Static game state for display (non-playable)
   const [gameOver] = useState(false);
@@ -662,11 +664,13 @@ const CommunicationInterface: React.FC = () => {
         setMenuActive(true);
         setCurrentMenuIndex(1);
         setActiveSelection(null);
+        setSelectedDpadButton(1); // Start with first button selected
       } else if (data[0] === 127) {
         console.log(`🏠 MAIN MENU: Menu stop (127)`);
         setMenuActive(false);
         setCurrentMenuIndex(0);
         setActiveSelection(null);
+        setSelectedDpadButton(null);
       }
       return;
     }
@@ -679,6 +683,12 @@ const CommunicationInterface: React.FC = () => {
           setMenuActive(true);
           setCurrentMenuIndex(newIndex);
           setActiveSelection(null);
+          // If selecting one of the first 5 options, also highlight the corresponding d-pad button (1-5)
+          if (newIndex >= 1 && newIndex <= 5) {
+            setSelectedDpadButton(newIndex);
+          } else {
+            setSelectedDpadButton(null);
+          }
           // Play select sound when highlighting a new card
           playSound('select.mp3');
           console.log(`🏠 MAIN MENU: State updated - menuActive=true, currentMenuIndex=${newIndex}`);
@@ -998,26 +1008,35 @@ const CommunicationInterface: React.FC = () => {
     // Map neural activations to D-pad movements based on option index
     const optionIndex = options.findIndex(opt => opt.id === pendingActionOptionId);
     if (optionIndex >= 0 && isStickEmConnected) {
+      // Map first 5 neural activations to D-pad buttons: 1=↑, 2=↖, 3=⚔, 4=↗, 5=↓
+      const dpadButtonIndex = optionIndex + 1; // Convert 0-4 to 1-5
+      
+      // Set active state with visual feedback
+      setActiveDpadButton(dpadButtonIndex);
+      setTimeout(() => {
+        setActiveDpadButton(null);
+      }, 1000); // Clear after 1 second
+      
       // Map first 5 neural activations to D-pad movements
       switch (optionIndex) {
-        case 0: // First option -> Forward
+        case 0: // First option -> Forward (↑)
           console.log('Neural activation: Sending Forward command');
           sendMovementWithAutoStop(SERVO_CMD_FORWARD);
           break;
-        case 1: // Second option -> Forward Left
+        case 1: // Second option -> Forward Left (↖)
           console.log('Neural activation: Sending Forward Left command');
           sendMovementWithAutoStop(SERVO_CMD_FORWARD_LEFT);
           break;
-        case 2: // Third option -> Stop
+        case 2: // Third option -> Stop (⚔)
           console.log('Neural activation: Sending Stop command');
           clearPendingAutoStop();
           sendStickEmCommand(SERVO_CMD_IDLE);
           break;
-        case 3: // Fourth option -> Forward Right
+        case 3: // Fourth option -> Forward Right (↗)
           console.log('Neural activation: Sending Forward Right command');
           sendMovementWithAutoStop(SERVO_CMD_FORWARD_RIGHT);
           break;
-        case 4: // Fifth option -> Backward
+        case 4: // Fifth option -> Backward (↓)
           console.log('Neural activation: Sending Backward command');
           sendMovementWithAutoStop(SERVO_CMD_REVERSE);
           break;
@@ -1067,25 +1086,18 @@ const CommunicationInterface: React.FC = () => {
       <main className="flex justify-center items-center min-h-screen py-8 px-4">
         {/* Horizontal Gameboy Console */}
         <div className="relative w-full max-w-[1400px] rounded-[48px] bg-[#3f2a79] border-[16px] border-[#1f1f1f] shadow-2xl overflow-hidden flex flex-col">
-          {/* Camera URL Input at Top */}
-          <div className="w-full pt-8 pb-4 px-12 flex justify-center">
-            <div className="relative bg-black/40 border-2 border-white/30 rounded-lg p-3 backdrop-blur-sm w-full max-w-[500px]">
-              <input
-                type="text"
-                value={ipCameraUrl}
-                onChange={(e) => setIpCameraUrl(e.target.value)}
-                placeholder="http://ip:port/stream"
-                className="w-full bg-transparent text-white/90 text-sm font-mono placeholder-white/40 border-none outline-none focus:outline-none text-center"
-              />
-            </div>
-          </div>
-
           {/* Main Content Container */}
-          <div className="relative z-10 w-full flex items-center justify-between px-12 py-4">
+          <div className="relative z-10 w-full flex items-center justify-center gap-6 px-8 py-6">
             {/* Left Side - D-Pad */}
-            <div className="flex flex-col items-center gap-4 w-[220px]">
-              <div className="grid grid-cols-3 gap-3 select-none">
-                <div />
+            <div className="flex flex-col items-center justify-center w-[400px] flex-shrink-0">
+              {/* Circular D-Pad Layout - True Circle Pattern (Revolver Style) */}
+              <div className="relative w-80 h-80 select-none flex items-center justify-center">
+                {/* Calculate positions using trigonometry for true circular arrangement */}
+                {/* Center: (160px, 160px), Radius: 135px (scaled up 1.5x) */}
+                {/* 5 buttons evenly spaced: 360°/5 = 72° apart */}
+                {/* Starting from top (90° from right), going clockwise: 90°, 18°, 306°, 234°, 162° */}
+                
+                {/* Button 1: Forward (↑) - Top (90° from right = 0° from top) */}
                 <button 
                   disabled={!isStickEmConnected} 
                   onClick={async () => {
@@ -1098,46 +1110,25 @@ const CommunicationInterface: React.FC = () => {
                       }, forwardDurationSec * 1000);
                     }
                   }}
-                  className={`h-16 w-16 rounded-xl bg-black text-white flex items-center justify-center text-3xl font-bold ${!isStickEmConnected ? 'opacity-40' : 'hover:bg-gray-800'}`} 
+                  className={`absolute h-24 w-24 rounded-full text-white flex items-center justify-center text-5xl font-bold transition-all duration-200 ${
+                    !isStickEmConnected ? 'opacity-40' : 'hover:bg-gray-700'
+                  } ${
+                    selectedDpadButton === 1 && activeDpadButton !== 1 
+                      ? 'border-4 border-green-500 bg-black' 
+                      : activeDpadButton === 1 
+                        ? 'bg-green-500 border-4 border-green-400' 
+                        : 'bg-black border-4 border-gray-600'
+                  }`}
+                  style={{
+                    left: 'calc(50% - 48px)',
+                    top: '0px'
+                  }}
                   aria-label="Forward"
                 >
                   ↑
                 </button>
-                <div />
-                <button 
-                  disabled={!isStickEmConnected} 
-                  onClick={async () => {
-                    clearPendingAutoStop();
-                    const sent = await sendStickEmCommand(SERVO_CMD_FORWARD_LEFT);
-                    if (sent) {
-                      movementStopTimeoutRef.current = setTimeout(() => {
-                        sendStickEmCommand(SERVO_CMD_IDLE);
-                        movementStopTimeoutRef.current = null;
-                      }, leftDurationSec * 1000);
-                    }
-                  }}
-                  className={`h-16 w-16 rounded-xl bg-black text-white flex items-center justify-center text-3xl font-bold ${!isStickEmConnected ? 'opacity-40' : 'hover:bg-gray-800'}`} 
-                  aria-label="Forward Left"
-                >
-                  ↖
-                </button>
-                <button 
-                  disabled={!isStickEmConnected} 
-                  onClick={async () => {
-                    clearPendingAutoStop();
-                    const sent = await sendStickEmCommand(SERVO_CMD_FORWARD);
-                    if (sent) {
-                      movementStopTimeoutRef.current = setTimeout(() => {
-                        sendStickEmCommand(SERVO_CMD_IDLE);
-                        movementStopTimeoutRef.current = null;
-                      }, forwardDurationSec * 1000);
-                    }
-                  }}
-                  className={`h-16 w-16 rounded-xl bg-red-600 text-white flex items-center justify-center text-3xl font-bold ${!isStickEmConnected ? 'opacity-40' : 'hover:bg-red-800'}`} 
-                  aria-label="Attack"
-                >
-                  ⚔
-                </button>
+
+                {/* Button 2: Forward Right (↗) - 18° from right (72° clockwise from top) */}
                 <button 
                   disabled={!isStickEmConnected} 
                   onClick={async () => {
@@ -1150,12 +1141,81 @@ const CommunicationInterface: React.FC = () => {
                       }, rightDurationSec * 1000);
                     }
                   }}
-                  className={`h-16 w-16 rounded-xl bg-black text-white flex items-center justify-center text-3xl font-bold ${!isStickEmConnected ? 'opacity-40' : 'hover:bg-gray-800'}`} 
+                  className={`absolute h-24 w-24 rounded-full text-white flex items-center justify-center text-5xl font-bold transition-all duration-200 ${
+                    !isStickEmConnected ? 'opacity-40' : 'hover:bg-gray-700'
+                  } ${
+                    selectedDpadButton === 4 && activeDpadButton !== 4 
+                      ? 'border-4 border-green-500 bg-black' 
+                      : activeDpadButton === 4 
+                        ? 'bg-green-500 border-4 border-green-400' 
+                        : 'bg-black border-4 border-gray-600'
+                  }`}
+                  style={{
+                    left: 'calc(50% + 128px - 48px)',
+                    top: 'calc(50% - 42px - 48px)'
+                  }}
                   aria-label="Forward Right"
                 >
                   ↗
                 </button>
-                <div />
+
+                {/* Button 3: Attack/Stop (⚔) - 306° from right (144° clockwise from top) */}
+                <button 
+                  disabled={!isStickEmConnected} 
+                  onClick={async () => {
+                    clearPendingAutoStop();
+                    await sendStickEmCommand(SERVO_CMD_IDLE);
+                  }}
+                  className={`absolute h-24 w-24 rounded-full text-white flex items-center justify-center text-5xl font-bold transition-all duration-200 ${
+                    !isStickEmConnected ? 'opacity-40' : 'hover:bg-red-700'
+                  } ${
+                    selectedDpadButton === 3 && activeDpadButton !== 3 
+                      ? 'border-4 border-green-500 bg-red-600' 
+                      : activeDpadButton === 3 
+                        ? 'bg-green-500 border-4 border-green-400' 
+                        : 'bg-red-600 border-4 border-red-500'
+                  }`}
+                  style={{
+                    left: 'calc(50% + 82px - 48px)',
+                    top: 'calc(50% + 109px - 48px)'
+                  }}
+                  aria-label="Attack"
+                >
+                  ⚔
+                </button>
+
+                {/* Button 4: Forward Left (↖) - 234° from right (216° clockwise from top) */}
+                <button 
+                  disabled={!isStickEmConnected} 
+                  onClick={async () => {
+                    clearPendingAutoStop();
+                    const sent = await sendStickEmCommand(SERVO_CMD_FORWARD_LEFT);
+                    if (sent) {
+                      movementStopTimeoutRef.current = setTimeout(() => {
+                        sendStickEmCommand(SERVO_CMD_IDLE);
+                        movementStopTimeoutRef.current = null;
+                      }, leftDurationSec * 1000);
+                    }
+                  }}
+                  className={`absolute h-24 w-24 rounded-full text-white flex items-center justify-center text-5xl font-bold transition-all duration-200 ${
+                    !isStickEmConnected ? 'opacity-40' : 'hover:bg-gray-700'
+                  } ${
+                    selectedDpadButton === 2 && activeDpadButton !== 2 
+                      ? 'border-4 border-green-500 bg-black' 
+                      : activeDpadButton === 2 
+                        ? 'bg-green-500 border-4 border-green-400' 
+                        : 'bg-black border-4 border-gray-600'
+                  }`}
+                  style={{
+                    left: 'calc(50% - 82px - 48px)',
+                    top: 'calc(50% + 109px - 48px)'
+                  }}
+                  aria-label="Forward Left"
+                >
+                  ↖
+                </button>
+
+                {/* Button 5: Backward (↓) - 162° from right (4th position, 72° * 4 = 288° clockwise from top) */}
                 <button 
                   disabled={!isStickEmConnected} 
                   onClick={async () => {
@@ -1168,19 +1228,32 @@ const CommunicationInterface: React.FC = () => {
                       }, backwardDurationSec * 1000);
                     }
                   }}
-                  className={`h-16 w-16 rounded-xl bg-black text-white flex items-center justify-center text-3xl font-bold ${!isStickEmConnected ? 'opacity-40' : 'hover:bg-gray-800'}`} 
+                  className={`absolute h-24 w-24 rounded-full text-white flex items-center justify-center text-5xl font-bold transition-all duration-200 ${
+                    !isStickEmConnected ? 'opacity-40' : 'hover:bg-gray-700'
+                  } ${
+                    selectedDpadButton === 5 && activeDpadButton !== 5 
+                      ? 'border-4 border-green-500 bg-black' 
+                      : activeDpadButton === 5 
+                        ? 'bg-green-500 border-4 border-green-400' 
+                        : 'bg-black border-4 border-gray-600'
+                  }`}
+                  style={{
+                    left: 'calc(50% - 128px - 48px)',
+                    top: 'calc(50% - 42px - 48px)'
+                  }}
                   aria-label="Backward"
                 >
                   ↓
                 </button>
-                <div />
               </div>
-              
-              {/* Speed Sliders for each direction */}
-              <div className="w-full space-y-3 mt-2">
+            </div>
+
+            {/* Center - Speed Sliders */}
+            <div className="flex flex-col items-center justify-center w-[400px] flex-shrink-0">
+              <div className="w-full space-y-4">
                 {/* Forward Slider */}
                 <div>
-                  <div className="text-white/80 text-xs mb-1 text-center">↑</div>
+                  <div className="text-white/80 text-lg mb-2 text-center font-semibold">↑</div>
                   <input 
                     type="range" 
                     min={1} 
@@ -1188,7 +1261,7 @@ const CommunicationInterface: React.FC = () => {
                     step={1} 
                     value={forwardDurationSec} 
                     onChange={(e) => setForwardDurationSec(parseInt(e.target.value))} 
-                    className="w-full h-1.5 rounded-lg appearance-none cursor-pointer"
+                    className="w-full h-3 rounded-lg appearance-none cursor-pointer"
                     style={{
                       background: `linear-gradient(to right, #ef4444 0%, #ef4444 ${((forwardDurationSec - 1) / 2) * 100}%, #4b5563 ${((forwardDurationSec - 1) / 2) * 100}%, #4b5563 100%)`
                     }}
@@ -1197,7 +1270,7 @@ const CommunicationInterface: React.FC = () => {
 
                 {/* Left Slider */}
                 <div>
-                  <div className="text-white/80 text-xs mb-1 text-center">↖</div>
+                  <div className="text-white/80 text-lg mb-2 text-center font-semibold">↖</div>
                   <input 
                     type="range" 
                     min={1} 
@@ -1205,7 +1278,7 @@ const CommunicationInterface: React.FC = () => {
                     step={1} 
                     value={leftDurationSec} 
                     onChange={(e) => setLeftDurationSec(parseInt(e.target.value))} 
-                    className="w-full h-1.5 rounded-lg appearance-none cursor-pointer"
+                    className="w-full h-3 rounded-lg appearance-none cursor-pointer"
                     style={{
                       background: `linear-gradient(to right, #ef4444 0%, #ef4444 ${((leftDurationSec - 1) / 2) * 100}%, #4b5563 ${((leftDurationSec - 1) / 2) * 100}%, #4b5563 100%)`
                     }}
@@ -1214,7 +1287,7 @@ const CommunicationInterface: React.FC = () => {
 
                 {/* Right Slider */}
                 <div>
-                  <div className="text-white/80 text-xs mb-1 text-center">↗</div>
+                  <div className="text-white/80 text-lg mb-2 text-center font-semibold">↗</div>
                   <input 
                     type="range" 
                     min={1} 
@@ -1222,7 +1295,7 @@ const CommunicationInterface: React.FC = () => {
                     step={1} 
                     value={rightDurationSec} 
                     onChange={(e) => setRightDurationSec(parseInt(e.target.value))} 
-                    className="w-full h-1.5 rounded-lg appearance-none cursor-pointer"
+                    className="w-full h-3 rounded-lg appearance-none cursor-pointer"
                     style={{
                       background: `linear-gradient(to right, #ef4444 0%, #ef4444 ${((rightDurationSec - 1) / 2) * 100}%, #4b5563 ${((rightDurationSec - 1) / 2) * 100}%, #4b5563 100%)`
                     }}
@@ -1231,7 +1304,7 @@ const CommunicationInterface: React.FC = () => {
 
                 {/* Backward Slider */}
                 <div>
-                  <div className="text-white/80 text-xs mb-1 text-center">↓</div>
+                  <div className="text-white/80 text-lg mb-2 text-center font-semibold">↓</div>
                   <input 
                     type="range" 
                     min={1} 
@@ -1239,7 +1312,7 @@ const CommunicationInterface: React.FC = () => {
                     step={1} 
                     value={backwardDurationSec} 
                     onChange={(e) => setBackwardDurationSec(parseInt(e.target.value))} 
-                    className="w-full h-1.5 rounded-lg appearance-none cursor-pointer"
+                    className="w-full h-3 rounded-lg appearance-none cursor-pointer"
                     style={{
                       background: `linear-gradient(to right, #ef4444 0%, #ef4444 ${((backwardDurationSec - 1) / 2) * 100}%, #4b5563 ${((backwardDurationSec - 1) / 2) * 100}%, #4b5563 100%)`
                     }}
@@ -1248,7 +1321,7 @@ const CommunicationInterface: React.FC = () => {
 
                 {/* Attack Slider */}
                 <div>
-                  <div className="text-white/80 text-xs mb-1 text-center">⚔</div>
+                  <div className="text-white/80 text-lg mb-2 text-center font-semibold">⚔</div>
                   <input 
                     type="range" 
                     min={1} 
@@ -1256,125 +1329,24 @@ const CommunicationInterface: React.FC = () => {
                     step={1} 
                     value={forwardDurationSec} 
                     onChange={(e) => setForwardDurationSec(parseInt(e.target.value))} 
-                    className="w-full h-1.5 rounded-lg appearance-none cursor-pointer"
+                    className="w-full h-3 rounded-lg appearance-none cursor-pointer"
                     style={{
                       background: `linear-gradient(to right, #ef4444 0%, #ef4444 ${((forwardDurationSec - 1) / 2) * 100}%, #4b5563 ${((forwardDurationSec - 1) / 2) * 100}%, #4b5563 100%)`
                     }}
                   />
                 </div>
 
-                <div className="flex justify-between text-white/50 text-xs mt-2">
+                <div className="flex justify-between text-white/50 text-sm mt-3 font-medium">
                   <span>1s</span>
                   <span>3s</span>
                 </div>
               </div>
             </div>
 
-            {/* Center - Screen/Iframe */}
-            <div className="flex-1 mx-8">
-              <div className="bg-black/30 rounded-3xl p-4 h-[480px] flex items-center justify-center relative">
-                {ipCameraUrl ? (
-                  <div className="w-full h-full rounded-2xl overflow-hidden">
-                    <iframe
-                      src={ipCameraUrl}
-                      title="IP Camera"
-                      className="w-full h-full border-0"
-                      scrolling="no"
-                      allow="autoplay; clipboard-write; encrypted-media; picture-in-picture"
-                    />
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center space-y-4 text-center w-full h-full">
-                    {gameOver ? (
-                      /* Game Over Screen */
-                      <div className="space-y-4">
-                        <div className="text-red-500 text-3xl font-bold font-mono animate-pulse">GAME OVER</div>
-                        <div className="text-white text-lg font-mono">FINAL SCORE: {score}</div>
-                        <button
-                          onClick={resetGame}
-                          className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors"
-                        >
-                          PLAY AGAIN
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        {/* Retro Game Display */}
-                        <div className="w-full max-w-md aspect-video bg-black border-4 border-gray-700 rounded-lg relative overflow-hidden">
-                          {/* Stars background */}
-                          <div className="absolute inset-0">
-                            {starPositions.map((star, i) => (
-                              <div
-                                key={i}
-                                className="absolute w-1 h-1 bg-white rounded-full animate-pulse"
-                                style={{
-                                  left: `${star.x}%`,
-                                  top: `${star.y}%`,
-                                  animationDelay: `${star.delay}s`,
-                                  animationDuration: `${star.duration}s`
-                                }}
-                              />
-                            ))}
-                          </div>
-
-                          {/* Space ship */}
-                          <div 
-                            className="absolute text-green-400 text-4xl transition-all duration-50"
-                            style={{ 
-                              left: `${shipPosition.x}%`, 
-                              bottom: `${100 - shipPosition.y}%`,
-                              transform: 'translateX(-50%)'
-                            }}
-                          >
-                            ▲
-                          </div>
-
-                          {/* Alien ships */}
-                          {alienShips.map(alien => (
-                            <div
-                              key={alien.id}
-                              className="absolute text-red-500 text-3xl transition-all duration-50"
-                              style={{
-                                left: `${alien.x}%`,
-                                top: `${alien.y}%`,
-                                transform: 'translate(-50%, -50%)'
-                              }}
-                            >
-                              ▼
-                            </div>
-                          ))}
-
-                          {/* Bullets */}
-                          {bullets.map(bullet => (
-                            <div
-                              key={bullet.id}
-                              className="absolute text-yellow-300 text-xl transition-all duration-50"
-                              style={{
-                                left: `${bullet.x}%`,
-                                bottom: `${100 - bullet.y}%`,
-                                transform: 'translateX(-50%)'
-                              }}
-                            >
-                              |
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Instructions */}
-                        <div className="space-y-1">
-                          <div className="text-white/80 text-xs font-mono">INSERT CAMERA URL ABOVE</div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
             {/* Right Side - Connect Buttons */}
-            <div className="flex flex-col items-center gap-4 w-[220px]">
+            <div className="flex flex-col items-center gap-4 w-[300px] flex-shrink-0">
               <div className="mb-2">
-                <div className="text-white/90 text-sm font-medium text-center whitespace-nowrap">
+                <div className="text-white/90 text-base font-semibold text-center whitespace-nowrap">
                   Connect<br/>Neural Drive
                 </div>
               </div>
@@ -1382,32 +1354,32 @@ const CommunicationInterface: React.FC = () => {
               <button 
                 onClick={toggleConnection} 
                 disabled={isConnecting}
-                className={`h-20 w-20 rounded-full bg-red-500 shadow-inner border-4 border-red-300 hover:bg-red-600 transition-colors flex items-center justify-center ${isConnecting ? 'animate-pulse' : ''}`} 
+                className={`h-28 w-28 rounded-full bg-red-500 shadow-inner border-4 border-red-300 hover:bg-red-600 transition-colors flex items-center justify-center ${isConnecting ? 'animate-pulse' : ''}`} 
                 aria-label="Connect Neural Drive" 
               />
               
               <button 
                 onClick={connectAccessories} 
                 disabled={isConnectingAccessories}
-                className={`h-20 w-20 rounded-full bg-blue-500 shadow-inner border-4 border-blue-300 hover:bg-blue-600 transition-colors flex items-center justify-center ${isConnectingAccessories ? 'animate-pulse' : ''}`} 
+                className={`h-28 w-28 rounded-full bg-blue-500 shadow-inner border-4 border-blue-300 hover:bg-blue-600 transition-colors flex items-center justify-center ${isConnectingAccessories ? 'animate-pulse' : ''}`} 
                 aria-label="Connect Stick Em" 
               />
 
               <div className="mt-2">
-                <div className="text-white/90 text-sm font-medium text-center whitespace-nowrap">
+                <div className="text-white/90 text-base font-semibold text-center whitespace-nowrap">
                   Connect<br/>Stick &apos;Em
                 </div>
               </div>
 
               {/* Status Indicators */}
-              <div className="flex flex-col gap-2 mt-4">
+              <div className="flex flex-col gap-2 mt-3">
                 <div className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`}></div>
-                  <span className="text-white/80 text-xs">Neural</span>
+                  <div className={`w-4 h-4 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`}></div>
+                  <span className="text-white/80 text-sm font-medium">Neural</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full ${isStickEmConnected ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`}></div>
-                  <span className="text-white/80 text-xs">Stick &apos;Em</span>
+                  <div className={`w-4 h-4 rounded-full ${isStickEmConnected ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`}></div>
+                  <span className="text-white/80 text-sm font-medium">Stick &apos;Em</span>
                 </div>
               </div>
             </div>
@@ -1415,7 +1387,7 @@ const CommunicationInterface: React.FC = () => {
 
           {/* Title at Bottom */}
           <div className="w-full pb-6 pt-4 flex justify-center">
-            <h2 className="text-white text-xl font-bold text-center">NeuralDrive x Stick &apos;Em™</h2>
+            <h2 className="text-white text-2xl font-bold text-center">Neural Drive x Stick Em</h2>
           </div>
         </div>
       </main>
