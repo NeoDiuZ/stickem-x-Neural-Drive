@@ -395,7 +395,6 @@ const CommunicationInterface: React.FC = () => {
   const [isStickEmConnected, setIsStickEmConnected] = useState(false);
   const [isConnectingAccessories, setIsConnectingAccessories] = useState(false);
   const lastServoSendRef = useRef<number>(0);
-  const [moveDurationSec] = useState<number>(1);
   const [forwardDurationSec, setForwardDurationSec] = useState<number>(1);
   const [leftDurationSec, setLeftDurationSec] = useState<number>(1);
   const [rightDurationSec, setRightDurationSec] = useState<number>(1);
